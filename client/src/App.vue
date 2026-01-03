@@ -9,13 +9,18 @@
   const status = ref("disconnected");
   const members = ref([]);
   const me = ref(null);
+  const myRole = ref(null);
   const roomState = ref(null);
 
   function sendAction(type, payload) {
     if (!socket.connected) return;
     socket.emit("room:action", { action: { type, payload } }, (res) => {
       if (!res?.ok) {
-        console.error("Action failed:", res?.error);
+        const errorMsg = res?.error === "PERMISSION_DENIED" 
+          ? "Permission denied: You don't have rights to perform this action"
+          : res?.error || "unknown";
+        console.error("Action failed:", errorMsg);
+        alert(`Action failed: ${errorMsg}`);
       }
     });
   }
@@ -36,9 +41,10 @@
         return;
       }
       me.value = res.me;
+      myRole.value = res.role;
       members.value = res.members;
       roomState.value = res.state;
-      status.value = `joined: ${res.code}`;
+      status.value = `joined: ${res.code} (${res.role})`;
     });
 
     socket.off("room:members");
@@ -74,13 +80,20 @@
   
       <p style="margin-top: 16px;">
         <b>Status:</b> {{ status }}
+        <span v-if="myRole" style="margin-left: 8px; padding: 2px 8px; background: #e0e0e0; border-radius: 4px; font-size: 12px;">
+          {{ myRole }}
+        </span>
       </p>
-  
+
       <div v-if="members.length" style="margin-top: 16px;">
         <h3>Members</h3>
         <ul>
           <li v-for="m in members" :key="m.id">
-            {{ m.name }} <span v-if="m.id === me">(you)</span>
+            {{ m.name }}
+            <span v-if="m.id === me" style="font-weight: bold;">(you)</span>
+            <span style="margin-left: 8px; padding: 2px 6px; background: #f0f0f0; border-radius: 4px; font-size: 11px;">
+              {{ m.role }}
+            </span>
           </li>
         </ul>
         <small>Открой вторую вкладку и зайди в тот же код — увидишь синхронизацию списка.</small>

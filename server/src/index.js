@@ -13,7 +13,7 @@ const io = new Server(server, {
   cors: { origin: true, credentials: true }
 });
 
-// В памяти: roomCode -> { createdAt, members: Map(socketId -> {name}), state }
+// В памяти: roomCode -> { createdAt, members: Map(socketId -> {name}), state, gmId }
 const rooms = new Map();
 
 function createRoomState() {
@@ -33,6 +33,53 @@ function makeRoomCode() {
 }
 
 /**
+ * Проверяет права пользователя на выполнение действия
+ * @param {Object} room - объект комнаты
+ * @param {Object} action - действие { type, payload }
+ * @param {string} socketId - ID сокета отправителя
+ * @returns {boolean} true если есть права
+ */
+function hasPermission(room, action, socketId) {
+  const isGM = room.gmId === socketId;
+  
+  // GM может всё
+  if (isGM) {
+    return true;
+  }
+  
+  // Player может только ограниченные действия
+  const { type, payload } = action;
+  
+  switch (type) {
+    case "MAP_SET":
+      // Player не может менять карту
+      return false;
+    
+    case "TOKEN_ADD":
+      // Player может добавлять токены (они будут с его ownerId)
+      return true;
+    
+    case "TOKEN_MOVE":
+    case "TOKEN_UPDATE":
+      // Player может двигать/обновлять только свои токены
+      if (!payload || !payload.id) return false;
+      const token = room.state.tokens[payload.id];
+      if (!token) return false;
+      return token.ownerId === socketId;
+    
+    case "TOKEN_REMOVE":
+      // Player может удалять только свои токены
+      if (!payload || !payload.id) return false;
+      const tokenToRemove = room.state.tokens[payload.id];
+      if (!tokenToRemove) return false;
+      return tokenToRemove.ownerId === socketId;
+    
+    default:
+      return false;
+  }
+}
+
+/**
  * Применяет действие к состоянию комнаты
  * @param {Object} room - объект комнаты
  * @param {Object} action - действие { type, payload }
@@ -42,6 +89,11 @@ function makeRoomCode() {
 function applyAction(room, action, socket) {
   if (!action || !action.type) {
     return { ok: false, error: "INVALID_ACTION" };
+  }
+
+  // Проверка прав
+  if (!hasPermission(room, action, socket.id)) {
+    return { ok: false, error: "PERMISSION_DENIED" };
   }
 
   const { type, payload } = action;
@@ -156,6 +208,7 @@ app.post("/rooms", (req, res) => {
     createdAt: Date.now(),
     members: new Map(),
     state: createRoomState(),
+    gmId: null, // будет установлен при первом присоединении
   });
   res.json({ code });
 });
@@ -168,18 +221,28 @@ io.on("connection", (socket) => {
     }
 
     const room = rooms.get(code);
+    
+    // Если комната пустая (нет GM), первый присоединившийся становится GM
+    if (!room.gmId && room.members.size === 0) {
+      room.gmId = socket.id;
+    }
+    
     room.members.set(socket.id, { name: name?.trim() || "Player" });
 
     socket.join(code);
     socket.data.roomCode = code;
 
+    // Определяем роль пользователя
+    const role = room.gmId === socket.id ? "GM" : "Player";
+
     const members = [...room.members.entries()].map(([id, m]) => ({
       id,
-      name: m.name
+      name: m.name,
+      role: id === room.gmId ? "GM" : "Player"
     }));
 
     // ответ присоединившемуся
-    ack?.({ ok: true, code, me: socket.id, members, state: room.state });
+    ack?.({ ok: true, code, me: socket.id, role, members, state: room.state });
 
     // обновление для всех в комнате
     io.to(code).emit("room:members", { members });
@@ -222,7 +285,8 @@ io.on("connection", (socket) => {
 
     const members = [...room.members.entries()].map(([id, m]) => ({
       id,
-      name: m.name
+      name: m.name,
+      role: id === room.gmId ? "GM" : "Player"
     }));
     io.to(code).emit("room:members", { members });
   });
