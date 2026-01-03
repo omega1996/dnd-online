@@ -2,10 +2,58 @@ import express from "express";
 import cors from "cors";
 import http from "http";
 import { Server } from "socket.io";
+import multer from "multer";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Создаем папку для загрузок если её нет
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Настройка multer для загрузки файлов
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    // Генерируем уникальное имя файла: timestamp-random-originalname
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `token-${uniqueSuffix}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB максимум
+  },
+  fileFilter: (req, file, cb) => {
+    // Разрешаем только изображения
+    const allowedTypes = /jpeg|jpg|png|gif|webp|svg/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'));
+    }
+  }
+});
+
+// Статическая раздача загруженных файлов
+app.use('/uploads', express.static(uploadsDir));
 
 const server = http.createServer(app);
 
@@ -198,6 +246,21 @@ function applyAction(room, action, socket) {
 }
 
 app.get("/health", (req, res) => res.json({ ok: true }));
+
+// Endpoint для загрузки изображений токенов
+app.post("/upload-token-image", upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+  
+  // Возвращаем URL для доступа к файлу
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({ 
+    ok: true, 
+    url: fileUrl,
+    filename: req.file.filename
+  });
+});
 
 app.post("/rooms", (req, res) => {
   // Создание комнаты по HTTP, чтобы клиент мог получить код без сокета

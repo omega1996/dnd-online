@@ -13,9 +13,21 @@
   const myRole = ref(null);
   const roomState = ref(null);
 
+  // Форма добавления токена (для мастера)
+  const showAddTokenForm = ref(false);
+  const newTokenFile = ref(null);
+  const newTokenOwnerId = ref("");
+  const isUploading = ref(false);
+
   // Computed для карты и токенов
   const mapSrc = computed(() => roomState.value?.map?.src || null);
   const tokens = computed(() => roomState.value?.tokens || {});
+  const isGM = computed(() => myRole.value === "GM");
+
+  // Computed для списка участников для выбора владельца
+  const membersForOwnerSelect = computed(() => {
+    return members.value.map(m => ({ id: m.id, name: m.name, role: m.role }));
+  });
 
   function sendAction(type, payload) {
     if (!socket.connected) return;
@@ -28,6 +40,96 @@
         alert(`Action failed: ${errorMsg}`);
       }
     });
+  }
+
+  // Генерация уникального ID для токена
+  function generateTokenId() {
+    return `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // Загрузка файла на сервер
+  async function uploadTokenImage(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(`${serverUrl}/upload-token-image`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || 'Failed to upload image');
+    }
+
+    const data = await response.json();
+    return data.url; // Возвращаем URL вида /uploads/filename.png
+  }
+
+  // Добавление токена (для мастера)
+  async function handleAddToken() {
+    if (!newTokenFile.value) {
+      alert("Please select an image file");
+      return;
+    }
+
+    if (isUploading.value) return; // Предотвращаем повторные клики
+
+    isUploading.value = true;
+
+    try {
+      // Загружаем файл на сервер
+      const imageUrl = await uploadTokenImage(newTokenFile.value);
+      
+      // Полный URL для доступа к файлу
+      const fullImageUrl = `${serverUrl}${imageUrl}`;
+
+      const tokenId = generateTokenId();
+      // Позиция по центру экрана (можно изменить на случайную или клик мыши)
+      const x = 400;
+      const y = 300;
+
+      const payload = {
+        id: tokenId,
+        x,
+        y,
+        src: fullImageUrl,
+        name: `Token ${tokenId.slice(-6)}`,
+        ownerId: newTokenOwnerId.value || undefined // Если не выбран, будет установлен socket.id мастера
+      };
+
+      sendAction('TOKEN_ADD', payload);
+      
+      // Очищаем форму
+      newTokenFile.value = null;
+      newTokenOwnerId.value = "";
+      showAddTokenForm.value = false;
+    } catch (error) {
+      console.error('[App] Failed to upload token image:', error);
+      alert(`Failed to upload image: ${error.message}`);
+    } finally {
+      isUploading.value = false;
+    }
+  }
+
+  // Обработчик выбора файла
+  function handleFileSelect(event) {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Проверяем тип файла
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        event.target.value = '';
+        return;
+      }
+      // Проверяем размер (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        event.target.value = '';
+        return;
+      }
+      newTokenFile.value = file;
+    }
   }
 
   // Обработчик перемещения токена
@@ -117,15 +219,66 @@
           </ul>
         </div>
 
-        <div v-if="roomState" style="margin-top: 16px;">
-          <h4>Test Actions</h4>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <!-- Инструменты мастера: Добавление токена -->
+        <div v-if="roomState && isGM" style="margin-top: 16px;">
+          <h4>GM Tools</h4>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start;">
+            <button @click="showAddTokenForm = !showAddTokenForm">
+              {{ showAddTokenForm ? 'Cancel' : 'Add Token' }}
+            </button>
             <button @click="sendAction('MAP_SET', { src: 'https://picsum.photos/800/600' })">
               Set Map
             </button>
-            <button @click="sendAction('TOKEN_ADD', { id: 'token-' + Date.now(), x: 100, y: 100, name: 'Test Token' })">
-              Add Token
-            </button>
+          </div>
+
+          <!-- Форма добавления токена -->
+          <div v-if="showAddTokenForm" style="margin-top: 12px; padding: 16px; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; max-width: 500px;">
+            <h5 style="margin-top: 0;">Add Token</h5>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <label style="display: flex; flex-direction: column; gap: 4px;">
+                <span>Token Image *</span>
+                <input 
+                  type="file"
+                  accept="image/*"
+                  @change="handleFileSelect"
+                  :disabled="isUploading"
+                  style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;"
+                />
+                <small style="color: #666; font-size: 11px;">
+                  Select an image file from your computer (max 5MB, formats: JPG, PNG, GIF, WebP, SVG)
+                </small>
+                <small v-if="newTokenFile" style="color: #28a745; font-size: 11px; margin-top: 4px;">
+                  Selected: {{ newTokenFile.name }} ({{ (newTokenFile.size / 1024).toFixed(1) }} KB)
+                </small>
+              </label>
+              <label style="display: flex; flex-direction: column; gap: 4px;">
+                <span>Owner (optional)</span>
+                <select 
+                  v-model="newTokenOwnerId"
+                  :disabled="isUploading"
+                  style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;"
+                >
+                  <option value="">None (GM owns)</option>
+                  <option v-for="member in membersForOwnerSelect" :key="member.id" :value="member.id">
+                    {{ member.name }} ({{ member.role }})
+                  </option>
+                </select>
+              </label>
+              <button 
+                @click="handleAddToken" 
+                :disabled="!newTokenFile || isUploading"
+                style="align-self: flex-start;"
+              >
+                {{ isUploading ? 'Uploading...' : 'Add Token' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Тестовые действия (можно оставить для отладки) -->
+        <div v-if="roomState" style="margin-top: 16px;">
+          <h4>Test Actions</h4>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button 
               v-if="roomState && Object.keys(roomState.tokens).length > 0"
               @click="() => {

@@ -98,9 +98,86 @@ async function loadMap(src) {
   }
 }
 
+  // Загрузка изображения токена
+async function loadTokenImage(tokenId, token) {
+  if (!token.src || !token.src.trim()) {
+    console.log(`[BoardCanvas] No src for token ${tokenId}, using default`);
+    // Если нет src, создаем простой круг
+    return createDefaultTokenSprite();
+  }
+
+  const src = token.src.trim();
+  console.log(`[BoardCanvas] Loading token image for ${tokenId} from ${src}`);
+
+  try {
+    // Используем тот же подход, что и для карты - через Assets.load
+    // Assets.load уже загружает изображение полностью, поэтому текстура должна быть готова
+    const textureResource = await PIXI.Assets.load(src);
+    
+    // Обрабатываем разные варианты возвращаемого значения
+    let finalTexture;
+    if (textureResource instanceof PIXI.Texture) {
+      finalTexture = textureResource;
+      console.log(`[BoardCanvas] Direct Texture instance for ${tokenId}`);
+    } else if (textureResource && textureResource.texture) {
+      finalTexture = textureResource.texture;
+      console.log(`[BoardCanvas] Texture from .texture property for ${tokenId}`);
+    } else {
+      // Fallback: создаем из URL напрямую
+      console.log(`[BoardCanvas] Using fallback Texture.from() for ${tokenId}`);
+      finalTexture = PIXI.Texture.from(src);
+    }
+    
+    if (!finalTexture) {
+      throw new Error('Failed to create texture object');
+    }
+    
+    // Assets.load уже загрузил изображение, поэтому текстура должна быть готова
+    // Проверяем только базовые свойства
+    if (finalTexture.width === 0 && finalTexture.height === 0) {
+      console.warn(`[BoardCanvas] Texture has zero dimensions for ${tokenId}, but continuing...`);
+    }
+    
+    console.log(`[BoardCanvas] Texture ready for ${tokenId}, size: ${finalTexture.width}x${finalTexture.height}`);
+    
+    const sprite = new PIXI.Sprite(finalTexture);
+    
+    // Проверяем, что спрайт создан корректно
+    if (sprite.width === 0 || sprite.height === 0) {
+      throw new Error('Sprite has zero dimensions');
+    }
+    
+    // Масштабируем токен до разумного размера (например, 60x60)
+    const maxSize = 60;
+    const scale = Math.min(maxSize / sprite.width, maxSize / sprite.height, 1);
+    sprite.scale.set(scale);
+    sprite.anchor.set(0.5, 0.5); // Центрируем
+    
+    console.log(`[BoardCanvas] Token sprite created for ${tokenId}, original: ${sprite.width}x${sprite.height}, scale: ${scale}, final: ${sprite.width * scale}x${sprite.height * scale}`);
+    
+    return sprite;
+  } catch (error) {
+    console.error(`[BoardCanvas] Failed to load token image for ${tokenId} from ${src}:`, error.message);
+    console.error(`[BoardCanvas] Error details:`, error);
+    // Fallback на дефолтный спрайт
+    return createDefaultTokenSprite();
+  }
+}
+
+// Создание дефолтного спрайта токена (круг)
+function createDefaultTokenSprite() {
+  const graphics = new PIXI.Graphics();
+  graphics.circle(0, 0, 30);
+  graphics.fill(0xffd700);
+  graphics.stroke({ width: 3, color: 0xff8c00 });
+  return graphics;
+}
+
 // Обновление токенов
-function updateTokens() {
+async function updateTokens() {
   if (!worldContainer.value) return;
+
+  console.log('[BoardCanvas] updateTokens called, tokens:', props.tokens);
 
   const currentTokenIds = new Set(Object.keys(props.tokens));
   const spriteTokenIds = new Set(tokenSprites.value.keys());
@@ -119,16 +196,14 @@ function updateTokens() {
 
   // Добавляем/обновляем токены
   for (const [tokenId, token] of Object.entries(props.tokens)) {
+    console.log(`[BoardCanvas] Processing token ${tokenId}:`, token);
     let sprite = tokenSprites.value.get(tokenId);
     
     if (!sprite) {
-      // Создаем простой круг
-      const graphics = new PIXI.Graphics();
-      graphics.circle(0, 0, 30);
-      graphics.fill(0xffd700);
-      graphics.stroke({ width: 3, color: 0xff8c00 });
+      console.log(`[BoardCanvas] Creating new sprite for token ${tokenId}`);
+      // Загружаем изображение токена
+      sprite = await loadTokenImage(tokenId, token);
       
-      sprite = graphics;
       sprite.x = token.x || 0;
       sprite.y = token.y || 0;
       sprite.tokenId = tokenId;
@@ -138,6 +213,8 @@ function updateTokens() {
       tokenSprites.value.set(tokenId, sprite);
       worldContainer.value.addChild(sprite);
       
+      console.log(`[BoardCanvas] Sprite added to container for token ${tokenId}`);
+      
       // Настраиваем drag для нового токена
       setupTokenDrag(sprite);
     } else {
@@ -145,6 +222,27 @@ function updateTokens() {
       if (boardState.draggedToken.value !== tokenId) {
         sprite.x = token.x || 0;
         sprite.y = token.y || 0;
+      }
+      
+      // Если изменился src, перезагружаем изображение
+      const currentSrc = sprite.texture?.baseTexture?.resource?.url || sprite.texture?.baseTexture?.resource?.src;
+      if (token.src && currentSrc !== token.src) {
+        // Удаляем старый спрайт
+        worldContainer.value.removeChild(sprite);
+        sprite.destroy();
+        tokenSprites.value.delete(tokenId);
+        
+        // Создаем новый с новым изображением
+        const newSprite = await loadTokenImage(tokenId, token);
+        newSprite.x = token.x || 0;
+        newSprite.y = token.y || 0;
+        newSprite.tokenId = tokenId;
+        newSprite.eventMode = 'static';
+        newSprite.cursor = 'pointer';
+        
+        tokenSprites.value.set(tokenId, newSprite);
+        worldContainer.value.addChild(newSprite);
+        setupTokenDrag(newSprite);
       }
     }
   }
