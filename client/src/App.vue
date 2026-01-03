@@ -9,6 +9,7 @@
   const status = ref("disconnected");
   const members = ref([]);
   const me = ref(null);
+  const roomState = ref(null);
   
   async function createRoom() {
     const r = await fetch(`${serverUrl}/rooms`, { method: "POST" });
@@ -27,12 +28,18 @@
       }
       me.value = res.me;
       members.value = res.members;
+      roomState.value = res.state;
       status.value = `joined: ${res.code}`;
     });
-  
+
     socket.off("room:members");
     socket.on("room:members", ({ members: m }) => {
       members.value = m;
+    });
+
+    socket.off("room:state");
+    socket.on("room:state", ({ state }) => {
+      roomState.value = state;
     });
   }
   </script>
@@ -52,8 +59,8 @@
           <input v-model="roomCode" placeholder="ABC123" />
         </label>
   
-        <button @click="createRoom">Create room</button>
         <button @click="joinRoom" :disabled="!roomCode.trim()">Join</button>
+        <button @click="createRoom">Create room</button>
       </div>
   
       <p style="margin-top: 16px;">
@@ -68,6 +75,12 @@
           </li>
         </ul>
         <small>Открой вторую вкладку и зайди в тот же код — увидишь синхронизацию списка.</small>
+      </div>
+
+      <div v-if="roomState" style="margin-top: 16px;">
+        <h3>Room State</h3>
+        <pre style="background: #f5f5f5; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 12px;">{{ JSON.stringify(roomState, null, 2) }}</pre>
+        <small>Состояние комнаты синхронизируется между всеми участниками.</small>
       </div>
     </div>
   </template>

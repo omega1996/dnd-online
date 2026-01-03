@@ -13,8 +13,17 @@ const io = new Server(server, {
   cors: { origin: true, credentials: true }
 });
 
-// В памяти: roomCode -> { createdAt, members: Map(socketId -> {name}) }
+// В памяти: roomCode -> { createdAt, members: Map(socketId -> {name}), state }
 const rooms = new Map();
+
+function createRoomState() {
+  return {
+    version: 1,
+    map: { src: null, grid: { size: 50, enabled: true } },
+    tokens: {}, // tokenId -> { id, x, y, src, name, ownerId }
+    meta: { createdAt: Date.now() },
+  };
+}
 
 function makeRoomCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // без O/0/1/I
@@ -30,7 +39,11 @@ app.post("/rooms", (req, res) => {
   let code = makeRoomCode();
   while (rooms.has(code)) code = makeRoomCode();
 
-  rooms.set(code, { createdAt: Date.now(), members: new Map() });
+  rooms.set(code, {
+    createdAt: Date.now(),
+    members: new Map(),
+    state: createRoomState(),
+  });
   res.json({ code });
 });
 
@@ -53,10 +66,29 @@ io.on("connection", (socket) => {
     }));
 
     // ответ присоединившемуся
-    ack?.({ ok: true, code, me: socket.id, members });
+    ack?.({ ok: true, code, me: socket.id, members, state: room.state });
 
     // обновление для всех в комнате
     io.to(code).emit("room:members", { members });
+  });
+
+  socket.on("room:action", ({ action, payload }, ack) => {
+    const code = socket.data.roomCode;
+    if (!code || !rooms.has(code)) {
+      ack?.({ ok: false, error: "NOT_IN_ROOM" });
+      return;
+    }
+
+    const room = rooms.get(code);
+
+    // Применяем действие к состоянию (пока просто обновляем версию)
+    // В будущем здесь будет логика обработки разных типов действий
+    room.state.version += 1;
+
+    // Отправляем обновленное состояние всем в комнате
+    io.to(code).emit("room:state", { state: room.state });
+
+    ack?.({ ok: true });
   });
 
   socket.on("disconnect", () => {
