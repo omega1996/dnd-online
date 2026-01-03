@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch } from "vue";
+import { useAuth } from "../composables/useAuth";
 
 const props = defineProps({
   serverUrl: {
@@ -14,6 +15,7 @@ const props = defineProps({
 
 const emit = defineEmits(['join', 'create-room']);
 
+const { user, logout } = useAuth();
 const myName = ref("");
 const roomCode = ref("");
 
@@ -34,12 +36,56 @@ function handleJoin() {
 function handleCreateRoom() {
   emit('create-room');
 }
+
+async function handleLogout() {
+  try {
+    await logout();
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+}
 </script>
 
 <template>
   <div style="display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; overflow: hidden; font-family: system-ui;">
     <div style="max-width: 400px; width: 100%; padding: 40px; background: #f9f9f9; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-      <h1 style="margin-top: 0; margin-bottom: 32px; text-align: center;">DnD Online</h1>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+        <h1 style="margin: 0; text-align: center; flex: 1;">DnD Online</h1>
+        
+      </div>
+
+      <!-- Информация о пользователе -->
+      <div
+        v-if="user"
+        style="
+          padding: 12px;
+          background: #e8f4f8;
+          border-radius: 8px;
+          margin-bottom: 20px;
+          font-size: 14px;
+          color: #555;
+        "
+      >
+        <div style="font-weight: 500; margin-bottom: 4px;">Signed in as:</div>
+        <div style="color: #007bff;">{{ user.email || user.displayName || 'User' }}</div>
+        <button
+          @click="handleLogout"
+          style="
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: white;
+            color: #666;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+          "
+          title="Sign out"
+        >
+          Sign Out
+        </button>
+      </div>
       
       <div style="display: flex; flex-direction: column; gap: 20px;">
         <label style="display: flex; flex-direction: column; gap: 8px;">

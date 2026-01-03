@@ -1,10 +1,16 @@
 <script setup>
   import { ref, computed } from "vue";
   import { socket } from "./socket";
+  import { useAuth } from "./composables/useAuth";
+  import AuthScreen from "./components/AuthScreen.vue";
   import LoginScreen from "./components/LoginScreen.vue";
   import GameScreen from "./components/GameScreen.vue";
   
   const serverUrl = "http://localhost:3001";
+  
+  // Авторизация
+  const { user, loading: authLoading } = useAuth();
+  const isAuthenticated = computed(() => !!user.value);
   
   const myName = ref("");
   const roomCode = ref("");
@@ -106,16 +112,34 @@
   
   <template>
     <div style="font-family: system-ui; height: 100vh; width: 100vw; overflow: hidden;">
-      <!-- Экран входа -->
+      <!-- Показываем загрузку при проверке авторизации -->
+      <div 
+        v-if="authLoading"
+        style="
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          font-size: 18px;
+          color: #666;
+        "
+      >
+        Loading...
+      </div>
+
+      <!-- Экран авторизации (если не авторизован) -->
+      <AuthScreen v-else-if="!isAuthenticated" />
+
+      <!-- Экран входа (если авторизован, но не в комнате) -->
       <LoginScreen 
-        v-if="!isInRoom"
+        v-else-if="!isInRoom"
         :server-url="serverUrl"
         :initial-room-code="roomCode"
         @join="handleJoin"
         @create-room="handleCreateRoom"
       />
 
-      <!-- Экран игры -->
+      <!-- Экран игры (если в комнате) -->
       <GameScreen 
         v-else
         :server-url="serverUrl"

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import BoardCanvas from "./BoardCanvas.vue";
+import { useAuth } from "../composables/useAuth";
 
 const props = defineProps({
   serverUrl: {
@@ -31,6 +32,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["leave", "token-move", "action"]);
+
+// Авторизация
+const { logout } = useAuth();
 
 // Форма добавления токена (для мастера)
 const showAddTokenForm = ref(false);
@@ -284,6 +288,14 @@ function handleLeave() {
   emit("leave");
 }
 
+async function handleLogout() {
+  try {
+    await logout();
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+}
+
 // Отладочная информация и инициализация
 onMounted(() => {
   console.log("[GameScreen] Mounted with props:", {
@@ -347,19 +359,37 @@ onUnmounted(() => {
           {{ myRole }}
         </span>
       </div>
-      <button
-        @click="handleLeave"
-        style="
-          padding: 8px 16px;
-          border-radius: 6px;
-          border: 1px solid #ccc;
-          background: white;
-          cursor: pointer;
-          font-weight: 500;
-        "
-      >
-        Leave Room
-      </button>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <button
+          @click="handleLeave"
+          style="
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: white;
+            cursor: pointer;
+            font-weight: 500;
+          "
+        >
+          Leave Room
+        </button>
+        <button
+          @click="handleLogout"
+          style="
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: white;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            color: #666;
+          "
+          title="Sign out"
+        >
+          Sign Out
+        </button>
+      </div>
     </div>
 
     <!-- Основной контент: карта слева, панель справа -->
