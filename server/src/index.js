@@ -135,11 +135,11 @@ function hasPermission(room, action, socketId) {
     case "MAP_SET":
       // Player не может менять карту
       return false;
-    
+
     case "TOKEN_ADD":
       // Player может добавлять токены (они будут с его ownerId)
       return true;
-    
+
     case "TOKEN_MOVE":
     case "TOKEN_UPDATE":
       // Player может двигать/обновлять только свои токены
@@ -147,14 +147,18 @@ function hasPermission(room, action, socketId) {
       const token = room.state.tokens[payload.id];
       if (!token) return false;
       return token.ownerId === socketId;
-    
+
     case "TOKEN_REMOVE":
       // Player может удалять только свои токены
       if (!payload || !payload.id) return false;
       const tokenToRemove = room.state.tokens[payload.id];
       if (!tokenToRemove) return false;
       return tokenToRemove.ownerId === socketId;
-    
+
+    case "DICE_ROLL":
+      // Все могут бросать кубики
+      return true;
+
     default:
       return false;
   }
@@ -230,10 +234,16 @@ function applyAction(room, action, socket) {
       }
       // Добавляем лог смены карты
       if (oldMapSrc !== payload.src) {
-        addLog(room, "map_change", {
-          mapSrc: payload.src,
-          grid: room.state.map.grid,
-        }, socket.id, userName);
+        addLog(
+          room,
+          "map_change",
+          {
+            mapSrc: payload.src,
+            grid: room.state.map.grid,
+          },
+          socket.id,
+          userName
+        );
       }
       break;
     }
@@ -256,11 +266,17 @@ function applyAction(room, action, socket) {
       };
       room.state.tokens[payload.id] = token;
       // Добавляем лог добавления токена
-      addLog(room, "token_add", {
-        tokenId: token.id,
-        tokenName: token.name,
-        position: { x: token.gridX, y: token.gridY },
-      }, socket.id, userName);
+      addLog(
+        room,
+        "token_add",
+        {
+          tokenId: token.id,
+          tokenName: token.name,
+          position: { x: token.gridX, y: token.gridY },
+        },
+        socket.id,
+        userName
+      );
       break;
     }
 
@@ -282,12 +298,18 @@ function applyAction(room, action, socket) {
       }
       // Добавляем лог перемещения только если позиция изменилась
       if (token.gridX !== oldX || token.gridY !== oldY) {
-        addLog(room, "move", {
-          tokenId: token.id,
-          tokenName: token.name,
-          from: { x: oldX, y: oldY },
-          to: { x: token.gridX, y: token.gridY },
-        }, socket.id, userName);
+        addLog(
+          room,
+          "move",
+          {
+            tokenId: token.id,
+            tokenName: token.name,
+            from: { x: oldX, y: oldY },
+            to: { x: token.gridX, y: token.gridY },
+          },
+          socket.id,
+          userName
+        );
       }
       break;
     }
@@ -338,6 +360,39 @@ function applyAction(room, action, socket) {
       delete room.state.tokens[payload.id];
       // Добавляем лог удаления токена
       addLog(room, "token_remove", tokenInfo, socket.id, userName);
+      break;
+    }
+
+    case "DICE_ROLL": {
+      if (
+        !payload ||
+        typeof payload.sides !== "number" ||
+        typeof payload.result !== "number"
+      ) {
+        return { ok: false, error: "INVALID_PAYLOAD" };
+      }
+      // Определяем критический результат для D20
+      let criticalType = null;
+      if (payload.sides === 20) {
+        if (payload.result === 1) {
+          criticalType = "failure"; // Критическая неудача
+        } else if (payload.result === 20) {
+          criticalType = "success"; // Критическая удача
+        }
+      }
+      // Добавляем лог броска кубика
+      addLog(
+        room,
+        "dice",
+        {
+          diceType: `D${payload.sides}`,
+          result: payload.result,
+          sides: payload.sides,
+          criticalType: criticalType,
+        },
+        socket.id,
+        userName
+      );
       break;
     }
 

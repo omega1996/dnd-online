@@ -40,7 +40,14 @@ function formatLogMessage(log) {
     case 'move':
       return `${log.data.tokenName || 'Токен'} переместился с (${log.data.from.x}, ${log.data.from.y}) на (${log.data.to.x}, ${log.data.to.y})`;
     case 'dice':
-      return `${log.userName} бросил кубик: ${log.data.result || 'N/A'}`;
+      const diceType = log.data.diceType || `D${log.data.sides || '?'}`;
+      const result = log.data.result || 'N/A';
+      if (log.data.criticalType === 'failure') {
+        return `${log.userName} бросил ${diceType}: ${result} - КРИТИЧЕСКАЯ НЕУДАЧА`;
+      } else if (log.data.criticalType === 'success') {
+        return `${log.userName} бросил ${diceType}: ${result} - КРИТИЧЕСКАЯ УДАЧА`;
+      }
+      return `${log.userName} бросил ${diceType}: ${result}`;
     case 'map_change':
       return `${log.userName} сменил карту`;
     case 'token_add':

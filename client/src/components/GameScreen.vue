@@ -7,6 +7,7 @@ import CharacterViewModal from "./CharacterViewModal.vue";
 import CreateCharacterModal from "./CreateCharacterModal.vue";
 import CharacterCard from "./CharacterCard.vue";
 import GameLogs from "./GameLogs.vue";
+import DiceRoller from "./DiceRoller.vue";
 
 const props = defineProps({
   serverUrl: {
@@ -399,6 +400,14 @@ function handleCharacterCreated() {
 
 function handleLeave() {
   emit("leave");
+}
+
+// Обработчик броска кубика
+function handleDiceRoll(sides, result) {
+  sendAction("DICE_ROLL", {
+    sides,
+    result,
+  });
 }
 
 async function handleLogout() {
@@ -798,6 +807,11 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
+
+        <!-- Roll the Dice -->
+        <DiceRoller
+          :on-roll="handleDiceRoll"
+        />
 
         <!-- Мои персонажи -->
         <div>
