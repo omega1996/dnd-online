@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import * as PIXI from 'pixi.js';
 import { useBoardState } from '../composables/useBoardState';
 
@@ -23,21 +23,63 @@ const app = ref(null);
 const worldContainer = ref(null);
 const mapSprite = ref(null);
 const tokenSprites = ref(new Map());
+const resizeObserver = ref(null);
 
 const boardState = useBoardState();
 
 // Инициализация PixiJS
 async function initPixi() {
-  if (!canvasRef.value) return;
+  if (!canvasRef.value) {
+    console.warn('[BoardCanvas] canvasRef is null');
+    return;
+  }
 
   try {
+    // Ждем, пока контейнер получит размеры
+    await nextTick();
+    
+    // Используем размеры контейнера или fallback значения
+    let width = canvasRef.value.clientWidth;
+    let height = canvasRef.value.clientHeight;
+    
+    // Если размеры еще не установлены, ждем еще немного
+    if (width === 0 || height === 0) {
+      // Ждем следующего кадра
+      await new Promise(resolve => {
+        const checkSize = () => {
+          if (canvasRef.value) {
+            width = canvasRef.value.clientWidth;
+            height = canvasRef.value.clientHeight;
+            if (width > 0 && height > 0) {
+              resolve();
+            } else {
+              requestAnimationFrame(checkSize);
+            }
+          } else {
+            resolve();
+          }
+        };
+        requestAnimationFrame(checkSize);
+      });
+      
+      // Если все еще нет размеров, используем fallback
+      if (width === 0 || height === 0) {
+        width = 800;
+        height = 600;
+        console.warn('[BoardCanvas] Container has zero size, using fallback:', width, 'x', height);
+      }
+    }
+
+    console.log('[BoardCanvas] Initializing with size:', width, 'x', height);
+
     app.value = new PIXI.Application();
     
     await app.value.init({
-      width: canvasRef.value.clientWidth,
-      height: canvasRef.value.clientHeight,
+      width: width,
+      height: height,
       backgroundColor: 0x2c3e50,
-      antialias: true
+      antialias: true,
+      resizeTo: undefined // Не используем автоматическое изменение размера
     });
 
     canvasRef.value.appendChild(app.value.canvas);
@@ -339,15 +381,18 @@ function updateMapSize() {
   mapSprite.value.height = canvasHeight;
 }
 
-// Обработчик изменения размера окна
+// Обработчик изменения размера контейнера
 function handleResize() {
   if (!app.value || !canvasRef.value) return;
   
   const newWidth = canvasRef.value.clientWidth;
   const newHeight = canvasRef.value.clientHeight;
   
-  app.value.renderer.resize(newWidth, newHeight);
-  updateMapSize();
+  if (newWidth > 0 && newHeight > 0 && (app.value.screen.width !== newWidth || app.value.screen.height !== newHeight)) {
+    console.log('[BoardCanvas] Resizing from', app.value.screen.width, 'x', app.value.screen.height, 'to:', newWidth, 'x', newHeight);
+    app.value.renderer.resize(newWidth, newHeight);
+    updateMapSize();
+  }
 }
 
 // Watchers
@@ -361,13 +406,33 @@ watch(() => props.tokens, () => {
   updateTokens();
 }, { deep: true });
 
-onMounted(() => {
-  initPixi();
+onMounted(async () => {
+  // Небольшая задержка, чтобы контейнер успел получить размеры от родителя
+  await nextTick();
+  setTimeout(async () => {
+    await initPixi();
+    
+    // Используем ResizeObserver для отслеживания изменений размеров контейнера
+    if (canvasRef.value && window.ResizeObserver) {
+      resizeObserver.value = new ResizeObserver(() => {
+        handleResize();
+      });
+      resizeObserver.value.observe(canvasRef.value);
+    }
+  }, 150);
+  
+  // Также слушаем изменения размера окна на случай, если ResizeObserver не поддерживается
   window.addEventListener('resize', handleResize);
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
+  
+  if (resizeObserver.value && canvasRef.value) {
+    resizeObserver.value.unobserve(canvasRef.value);
+    resizeObserver.value.disconnect();
+  }
+  
   if (app.value) {
     app.value.destroy(true);
   }
@@ -382,7 +447,10 @@ onUnmounted(() => {
 .board-canvas {
   width: 100%;
   height: 100%;
+  min-width: 100px;
+  min-height: 100px;
   position: relative;
   overflow: hidden;
+  flex: 1;
 }
 </style>
