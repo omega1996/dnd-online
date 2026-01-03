@@ -19,6 +19,11 @@
   const newTokenOwnerId = ref("");
   const isUploading = ref(false);
 
+  // Форма загрузки карты (для мастера)
+  const showSetMapForm = ref(false);
+  const newMapFile = ref(null);
+  const isUploadingMap = ref(false);
+
   // Computed для карты и токенов
   const mapSrc = computed(() => roomState.value?.map?.src || null);
   const tokens = computed(() => roomState.value?.tokens || {});
@@ -53,6 +58,25 @@
     formData.append('image', file);
 
     const response = await fetch(`${serverUrl}/upload-token-image`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || 'Failed to upload image');
+    }
+
+    const data = await response.json();
+    return data.url; // Возвращаем URL вида /uploads/filename.png
+  }
+
+  // Загрузка карты на сервер
+  async function uploadMapImage(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(`${serverUrl}/upload-map-image`, {
       method: 'POST',
       body: formData
     });
@@ -129,6 +153,58 @@
         return;
       }
       newTokenFile.value = file;
+    }
+  }
+
+  // Обработчик выбора файла карты
+  function handleMapFileSelect(event) {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Проверяем тип файла
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        event.target.value = '';
+        return;
+      }
+      // Проверяем размер (10MB для карт)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        event.target.value = '';
+        return;
+      }
+      newMapFile.value = file;
+    }
+  }
+
+  // Установка карты (для мастера)
+  async function handleSetMap() {
+    if (!newMapFile.value) {
+      alert("Please select an image file");
+      return;
+    }
+
+    if (isUploadingMap.value) return; // Предотвращаем повторные клики
+
+    isUploadingMap.value = true;
+
+    try {
+      // Загружаем файл на сервер
+      const imageUrl = await uploadMapImage(newMapFile.value);
+      
+      // Полный URL для доступа к файлу
+      const fullImageUrl = `${serverUrl}${imageUrl}`;
+
+      // Отправляем действие установки карты
+      sendAction('MAP_SET', { src: fullImageUrl });
+      
+      // Очищаем форму
+      newMapFile.value = null;
+      showSetMapForm.value = false;
+    } catch (error) {
+      console.error('[App] Failed to upload map image:', error);
+      alert(`Failed to upload image: ${error.message}`);
+    } finally {
+      isUploadingMap.value = false;
     }
   }
 
@@ -226,8 +302,8 @@
             <button @click="showAddTokenForm = !showAddTokenForm">
               {{ showAddTokenForm ? 'Cancel' : 'Add Token' }}
             </button>
-            <button @click="sendAction('MAP_SET', { src: 'https://picsum.photos/800/600' })">
-              Set Map
+            <button @click="showSetMapForm = !showSetMapForm">
+              {{ showSetMapForm ? 'Cancel' : 'Set Map' }}
             </button>
           </div>
 
@@ -270,6 +346,36 @@
                 style="align-self: flex-start;"
               >
                 {{ isUploading ? 'Uploading...' : 'Add Token' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Форма загрузки карты -->
+          <div v-if="showSetMapForm" style="margin-top: 12px; padding: 16px; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; max-width: 500px;">
+            <h5 style="margin-top: 0;">Set Map</h5>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <label style="display: flex; flex-direction: column; gap: 4px;">
+                <span>Map Image *</span>
+                <input 
+                  type="file"
+                  accept="image/*"
+                  @change="handleMapFileSelect"
+                  :disabled="isUploadingMap"
+                  style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;"
+                />
+                <small style="color: #666; font-size: 11px;">
+                  Select an image file from your computer (max 10MB, formats: JPG, PNG, GIF, WebP, SVG)
+                </small>
+                <small v-if="newMapFile" style="color: #28a745; font-size: 11px; margin-top: 4px;">
+                  Selected: {{ newMapFile.name }} ({{ (newMapFile.size / 1024).toFixed(1) }} KB)
+                </small>
+              </label>
+              <button 
+                @click="handleSetMap" 
+                :disabled="!newMapFile || isUploadingMap"
+                style="align-self: flex-start;"
+              >
+                {{ isUploadingMap ? 'Uploading...' : 'Set Map' }}
               </button>
             </div>
           </div>

@@ -52,6 +52,38 @@ const upload = multer({
   }
 });
 
+// Настройка multer для загрузки карт
+const mapStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    // Генерируем уникальное имя файла: timestamp-random-originalname
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `map-${uniqueSuffix}${ext}`);
+  }
+});
+
+const uploadMap = multer({
+  storage: mapStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB максимум для карт (они могут быть больше)
+  },
+  fileFilter: (req, file, cb) => {
+    // Разрешаем только изображения
+    const allowedTypes = /jpeg|jpg|png|gif|webp|svg/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'));
+    }
+  }
+});
+
 // Статическая раздача загруженных файлов
 app.use('/uploads', express.static(uploadsDir));
 
@@ -249,6 +281,21 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 
 // Endpoint для загрузки изображений токенов
 app.post("/upload-token-image", upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+  
+  // Возвращаем URL для доступа к файлу
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({ 
+    ok: true, 
+    url: fileUrl,
+    filename: req.file.filename
+  });
+});
+
+// Endpoint для загрузки изображений карт
+app.post("/upload-map-image", uploadMap.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded" });
   }

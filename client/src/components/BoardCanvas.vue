@@ -63,7 +63,7 @@ async function initPixi() {
 
 // Загрузка карты
 async function loadMap(src) {
-  if (!worldContainer.value || !src) return;
+  if (!worldContainer.value || !src || !app.value) return;
 
   try {
     // Удаляем старую карту
@@ -92,6 +92,15 @@ async function loadMap(src) {
     }
     
     mapSprite.value = new PIXI.Sprite(finalTexture);
+    
+    // Растягиваем карту на весь размер canvas
+    const canvasWidth = app.value.screen.width;
+    const canvasHeight = app.value.screen.height;
+    mapSprite.value.width = canvasWidth;
+    mapSprite.value.height = canvasHeight;
+    mapSprite.value.x = 0;
+    mapSprite.value.y = 0;
+    
     worldContainer.value.addChildAt(mapSprite.value, 0);
   } catch (error) {
     console.error('[BoardCanvas] Failed to load map:', error);
@@ -320,6 +329,27 @@ function setupInteraction() {
   });
 }
 
+// Обновление размера карты при изменении размера canvas
+function updateMapSize() {
+  if (!mapSprite.value || !app.value) return;
+  
+  const canvasWidth = app.value.screen.width;
+  const canvasHeight = app.value.screen.height;
+  mapSprite.value.width = canvasWidth;
+  mapSprite.value.height = canvasHeight;
+}
+
+// Обработчик изменения размера окна
+function handleResize() {
+  if (!app.value || !canvasRef.value) return;
+  
+  const newWidth = canvasRef.value.clientWidth;
+  const newHeight = canvasRef.value.clientHeight;
+  
+  app.value.renderer.resize(newWidth, newHeight);
+  updateMapSize();
+}
+
 // Watchers
 watch(() => props.mapSrc, (newSrc) => {
   if (newSrc && worldContainer.value) {
@@ -333,9 +363,11 @@ watch(() => props.tokens, () => {
 
 onMounted(() => {
   initPixi();
+  window.addEventListener('resize', handleResize);
 });
 
 onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
   if (app.value) {
     app.value.destroy(true);
   }
