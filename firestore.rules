@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Правила для персонажей
+    match /characters/{characterId} {
+      // Разрешаем чтение персонажа, если пользователь авторизован
+      // Это нужно для просмотра характеристик по tokenId
+      allow read: if request.auth != null;
+      
+      // Разрешаем создание персонажа авторизованным пользователям
+      // userId должен совпадать с текущим пользователем
+      allow create: if request.auth != null 
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.imageUrl is string
+        && request.resource.data.stats is map
+        && request.resource.data.stats.health is int
+        && request.resource.data.stats.agility is int
+        && request.resource.data.stats.strength is int
+        && request.resource.data.stats.intelligence is int;
+      
+      // Разрешаем обновление только своих персонажей
+      allow update: if request.auth != null 
+        && resource.data.userId == request.auth.uid
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['userId']));
+      
+      // Разрешаем удаление только своих персонажей
+      allow delete: if request.auth != null 
+        && resource.data.userId == request.auth.uid;
+    }
+  }
+}

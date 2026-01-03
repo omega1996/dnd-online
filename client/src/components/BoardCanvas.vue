@@ -19,6 +19,10 @@ const props = defineProps({
   onTokenMove: {
     type: Function,
     required: true
+  },
+  onTokenClick: {
+    type: Function,
+    default: null
   }
 });
 
@@ -386,38 +390,84 @@ function setupTokenDrag(sprite) {
   sprite.off('pointerup');
   sprite.off('pointerupoutside');
 
+  let dragStartPos = null;
+  const DRAG_THRESHOLD = 5; // Минимальное расстояние для начала drag
+
   sprite.on('pointerdown', (e) => {
     e.stopPropagation();
     const worldPos = globalToWorld(e.global.x, e.global.y);
     const token = props.tokens[sprite.tokenId];
     if (token) {
       const pixelPos = gridToPixel(token.gridX || 0, token.gridY || 0);
+      dragStartPos = { x: worldPos.x, y: worldPos.y };
       boardState.startDragToken(sprite.tokenId, worldPos.x, worldPos.y, pixelPos.x, pixelPos.y);
       sprite.alpha = 0.7;
     }
   });
 
-  sprite.on('pointerup', () => {
+  sprite.on('pointerup', (e) => {
     if (boardState.draggedToken.value === sprite.tokenId) {
       sprite.alpha = 1;
+      
+      // Проверяем, был ли это drag или клик
+      const worldPos = globalToWorld(e.global.x, e.global.y);
+      const dragDistance = dragStartPos 
+        ? Math.sqrt(
+            Math.pow(worldPos.x - dragStartPos.x, 2) + 
+            Math.pow(worldPos.y - dragStartPos.y, 2)
+          )
+        : 0;
+      
       const finalPos = boardState.endDragToken();
-      if (finalPos) {
-        // Преобразуем пиксели в координаты сетки
+      
+      if (dragDistance < DRAG_THRESHOLD && finalPos) {
+        // Это был клик, а не drag
+        if (props.onTokenClick) {
+          const token = props.tokens[sprite.tokenId];
+          if (token && token.characterId) {
+            props.onTokenClick(sprite.tokenId);
+          }
+        }
+      } else if (finalPos) {
+        // Это был drag
         const gridPos = pixelToGrid(finalPos.x, finalPos.y);
         props.onTokenMove(finalPos.tokenId, gridPos.gridX, gridPos.gridY);
       }
+      
+      dragStartPos = null;
     }
   });
 
-  sprite.on('pointerupoutside', () => {
+  sprite.on('pointerupoutside', (e) => {
     if (boardState.draggedToken.value === sprite.tokenId) {
       sprite.alpha = 1;
+      
+      // Проверяем, был ли это drag или клик
+      const worldPos = globalToWorld(e.global.x, e.global.y);
+      const dragDistance = dragStartPos 
+        ? Math.sqrt(
+            Math.pow(worldPos.x - dragStartPos.x, 2) + 
+            Math.pow(worldPos.y - dragStartPos.y, 2)
+          )
+        : 0;
+      
       const finalPos = boardState.endDragToken();
-      if (finalPos) {
-        // Преобразуем пиксели в координаты сетки
+      
+      if (dragDistance < DRAG_THRESHOLD && finalPos) {
+        // Это был клик, а не drag
+        if (props.onTokenClick) {
+          const token = props.tokens[sprite.tokenId];
+          if (token && token.characterId) {
+            props.onTokenClick(sprite.tokenId);
+          }
+        }
+      } else if (finalPos) {
+        // Это был drag
         const gridPos = pixelToGrid(finalPos.x, finalPos.y);
         props.onTokenMove(finalPos.tokenId, gridPos.gridX, gridPos.gridY);
       }
+      
+      dragStartPos = null;
     }
   });
 }

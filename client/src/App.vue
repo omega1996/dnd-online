@@ -19,6 +19,7 @@
   const me = ref(null);
   const myRole = ref(null);
   const roomState = ref(null);
+  const pendingCharacterToken = ref(null); // Персонаж, который нужно добавить после входа в комнату
 
   // Computed для определения, вошел ли пользователь в комнату
   const isInRoom = computed(() => {
@@ -78,6 +79,16 @@
       console.log('[App] Initial room state:', res.state);
       console.log('[App] Initial tokens:', res.state?.tokens);
       console.log('[App] isInRoom after join:', roomState.value !== null && me.value !== null);
+      
+      // Если есть персонаж, который нужно добавить, добавляем его
+      if (pendingCharacterToken.value) {
+        const character = pendingCharacterToken.value;
+        pendingCharacterToken.value = null;
+        // Небольшая задержка, чтобы GameScreen успел смонтироваться
+        setTimeout(() => {
+          handleAddCharacterToken(character);
+        }, 100);
+      }
     });
 
     socket.off("room:members");
@@ -107,6 +118,24 @@
     status.value = "disconnected";
     roomCode.value = "";
     console.log('[App] Left room');
+  }
+
+  // Обработчик добавления токена персонажа
+  function handleAddCharacterToken(character) {
+    console.log('[App] Adding character token:', character);
+    // Если пользователь уже в комнате, передаем персонажа в GameScreen через событие
+    if (isInRoom.value) {
+      // GameScreen будет слушать это событие
+      // Пока просто сохраняем персонажа, GameScreen сам его заберет
+      pendingCharacterToken.value = character;
+    } else {
+      // Если не в комнате, сохраняем персонажа для добавления после входа
+      pendingCharacterToken.value = character;
+      // Показываем сообщение, что нужно присоединиться к комнате
+      if (!roomCode.value.trim() || !myName.value.trim()) {
+        alert("Please enter your name and room code, then join the room to add your character token");
+      }
+    }
   }
   </script>
   
@@ -148,9 +177,11 @@
         :me="me"
         :my-role="myRole"
         :room-state="roomState"
+        :pending-character-token="pendingCharacterToken"
         @leave="handleLeave"
         @token-move="handleTokenMove"
         @action="handleAction"
+        @character-token-added="pendingCharacterToken = null"
       />
     </div>
   </template>

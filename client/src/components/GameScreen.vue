@@ -1,7 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import BoardCanvas from "./BoardCanvas.vue";
 import { useAuth } from "../composables/useAuth";
+import { useCharacters } from "../composables/useCharacters";
+import CharacterViewModal from "./CharacterViewModal.vue";
+import CreateCharacterModal from "./CreateCharacterModal.vue";
+import CharacterCard from "./CharacterCard.vue";
 
 const props = defineProps({
   serverUrl: {
@@ -29,12 +33,22 @@ const props = defineProps({
     required: true,
     default: () => ({ map: null, tokens: {} }),
   },
+  pendingCharacterToken: {
+    type: Object,
+    default: null,
+  },
 });
 
-const emit = defineEmits(["leave", "token-move", "action"]);
+const emit = defineEmits(["leave", "token-move", "action", "character-token-added"]);
 
 // Авторизация
 const { logout } = useAuth();
+const { characters, fetchCharacters, loading: charactersLoading } = useCharacters();
+
+// Модальное окно просмотра персонажа
+const selectedCharacter = ref(null);
+const loadingCharacter = ref(false);
+const showCreateCharacterModal = ref(false);
 
 // Форма добавления токена (для мастера)
 const showAddTokenForm = ref(false);
@@ -284,6 +298,103 @@ function handleTokenMove(tokenId, gridX, gridY) {
   emit("token-move", tokenId, gridX, gridY);
 }
 
+// Обработчик клика на токен (для просмотра персонажа)
+function handleTokenClick(tokenId) {
+  if (!tokenId) return;
+  
+  // Находим токен на доске
+  const token = tokens.value[tokenId];
+  if (!token || !token.characterId) {
+    console.log("Token has no characterId, cannot show character");
+    return;
+  }
+  
+  // Находим персонажа в локальном списке по characterId
+  const character = characters.value.find((c) => c.id === token.characterId);
+  if (character) {
+    selectedCharacter.value = character;
+  } else {
+    console.log("Character not found in local list, characterId:", token.characterId);
+  }
+}
+
+// Обработчик просмотра персонажа из списка
+function handleViewCharacter(character) {
+  selectedCharacter.value = character;
+}
+
+// Обработчик добавления токена персонажа
+function handleAddCharacterToken(character) {
+  if (!character || !character.imageUrl) {
+    console.error("Character data is missing");
+    return;
+  }
+
+  // Генерируем уникальный ID для токена
+  const tokenId = generateTokenId();
+  
+  // Позиция на сетке (0, 0) - начальная позиция
+  const gridX = 0;
+  const gridY = 0;
+
+  const payload = {
+    id: tokenId,
+    gridX,
+    gridY,
+    src: character.imageUrl,
+    name: character.name,
+    ownerId: props.me,
+    characterId: character.id, // Сохраняем ID персонажа в токене
+  };
+
+  // Отправляем действие на сервер - токен будет добавлен в roomState.tokens
+  sendAction("TOKEN_ADD", payload);
+  // Не нужно обновлять Firebase - состояние токена хранится только на сервере
+}
+
+// Обработчик удаления токена с доски
+function handleRemoveCharacterToken(tokenId) {
+  if (!tokenId) {
+    console.error("Token ID is missing");
+    return;
+  }
+
+  // Находим токен на доске
+  const token = tokens.value[tokenId];
+  if (!token) {
+    console.error("Token not found on board");
+    return;
+  }
+
+  // Проверяем, что токен принадлежит текущему пользователю
+  if (token.ownerId !== props.me) {
+    console.error("Cannot remove token: not owner");
+    return;
+  }
+  
+  // Удаляем токен с доски - отправляем действие на сервер
+  sendAction("TOKEN_REMOVE", { id: tokenId });
+  // Не нужно обновлять Firebase - состояние токена хранится только на сервере
+}
+
+// Загружаем персонажей при монтировании
+onMounted(async () => {
+  await fetchCharacters();
+});
+
+// Следим за pendingCharacterToken и добавляем токен при его появлении
+watch(() => props.pendingCharacterToken, (character) => {
+  if (character) {
+    handleAddCharacterToken(character);
+    emit('character-token-added');
+  }
+}, { immediate: true });
+
+// Обработчик создания персонажа
+function handleCharacterCreated() {
+  fetchCharacters();
+}
+
 function handleLeave() {
   emit("leave");
 }
@@ -421,6 +532,7 @@ onUnmounted(() => {
           :tokens="tokens"
           :map-grid="roomState?.map?.grid"
           :on-token-move="handleTokenMove"
+          :on-token-click="handleTokenClick"
         />
       </div>
 
@@ -663,6 +775,55 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <!-- Мои персонажи -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin-top: 0; margin-bottom: 0; font-size: 18px">
+              My Characters
+            </h3>
+            <button
+              @click="showCreateCharacterModal = true"
+              style="
+                padding: 6px 12px;
+                border-radius: 4px;
+                border: none;
+                background: #28a745;
+                color: white;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 500;
+              "
+              title="Create new character"
+            >
+              + New
+            </button>
+          </div>
+
+          <div v-if="charactersLoading" style="text-align: center; padding: 12px; color: #666; font-size: 13px;">
+            Loading...
+          </div>
+
+          <div v-else-if="characters.length === 0" style="text-align: center; padding: 16px; color: #666; background: white; border-radius: 6px; border: 1px solid #ddd; font-size: 13px;">
+            No characters yet. Create one to add it as a token!
+          </div>
+
+          <div v-else style="display: flex; flex-direction: column; gap: 8px;">
+            <CharacterCard
+              v-for="character in characters"
+              :key="character.id"
+              :character="character"
+              :room-tokens="tokens"
+              :current-user-id="me"
+              :show-add-token="true"
+              :show-remove-token="true"
+              size="compact"
+              @view="handleViewCharacter"
+              @add-token="handleAddCharacterToken"
+              @remove-token="handleRemoveCharacterToken"
+            />
+          </div>
+        </div>
+
         <!-- Список участников -->
         <div>
           <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px">
@@ -715,6 +876,21 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Модальное окно просмотра персонажа -->
+    <CharacterViewModal
+      v-if="selectedCharacter"
+      :character="selectedCharacter"
+      @close="selectedCharacter = null"
+    />
+
+    <!-- Модальное окно создания персонажа -->
+    <CreateCharacterModal
+      v-if="showCreateCharacterModal"
+      :server-url="serverUrl"
+      @close="showCreateCharacterModal = false"
+      @created="handleCharacterCreated"
+    />
   </div>
 </template>
 

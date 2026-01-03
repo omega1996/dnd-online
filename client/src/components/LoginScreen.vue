@@ -1,6 +1,10 @@
 <script setup>
-import { ref, watch } from "vue";
+import { ref, watch, onMounted } from "vue";
 import { useAuth } from "../composables/useAuth";
+import { useCharacters } from "../composables/useCharacters";
+import CreateCharacterModal from "./CreateCharacterModal.vue";
+import CharacterViewModal from "./CharacterViewModal.vue";
+import CharacterCard from "./CharacterCard.vue";
 
 const props = defineProps({
   serverUrl: {
@@ -16,13 +20,30 @@ const props = defineProps({
 const emit = defineEmits(['join', 'create-room']);
 
 const { user, logout } = useAuth();
+const { characters, fetchCharacters, loading: charactersLoading } = useCharacters();
 const myName = ref("");
 const roomCode = ref("");
+const showCreateModal = ref(false);
+const selectedCharacter = ref(null);
 
 // Синхронизируем код комнаты из пропсов
 watch(() => props.initialRoomCode, (newCode) => {
   if (newCode) {
     roomCode.value = newCode;
+  }
+}, { immediate: true });
+
+// Загружаем персонажей при монтировании
+onMounted(async () => {
+  if (user.value) {
+    await fetchCharacters();
+  }
+});
+
+// Следим за изменением пользователя
+watch(() => user.value, async (newUser) => {
+  if (newUser) {
+    await fetchCharacters();
   }
 }, { immediate: true });
 
@@ -44,14 +65,21 @@ async function handleLogout() {
     console.error("Logout error:", error);
   }
 }
+
+function handleCharacterCreated() {
+  fetchCharacters();
+}
+
+function handleViewCharacter(character) {
+  selectedCharacter.value = character;
+}
 </script>
 
 <template>
-  <div style="display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; overflow: hidden; font-family: system-ui;">
-    <div style="max-width: 400px; width: 100%; padding: 40px; background: #f9f9f9; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+  <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; width: 100vw; overflow-y: auto; font-family: system-ui; padding: 20px;">
+    <div style="max-width: 600px; width: 100%; padding: 40px; background: #f9f9f9; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
         <h1 style="margin: 0; text-align: center; flex: 1;">DnD Online</h1>
-        
       </div>
 
       <!-- Информация о пользователе -->
@@ -80,11 +108,56 @@ async function handleLogout() {
             font-size: 14px;
             font-weight: 500;
             white-space: nowrap;
+            margin-top: 8px;
           "
           title="Sign out"
         >
           Sign Out
         </button>
+      </div>
+
+      <!-- Секция персонажей -->
+      <div v-if="user" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h2 style="margin: 0; font-size: 18px;">My Characters</h2>
+          <button
+            @click="showCreateModal = true"
+            style="
+              padding: 8px 16px;
+              border-radius: 6px;
+              border: none;
+              background: #28a745;
+              color: white;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: 500;
+            "
+          >
+            + Create Character
+          </button>
+        </div>
+
+        <div v-if="charactersLoading" style="text-align: center; padding: 20px; color: #666;">
+          Loading characters...
+        </div>
+
+        <div v-else-if="characters.length === 0" style="text-align: center; padding: 20px; color: #666; background: white; border-radius: 8px; border: 1px solid #ddd;">
+          No characters yet. Create your first character!
+        </div>
+
+        <div v-else style="display: flex; flex-direction: column; gap: 12px;">
+          <CharacterCard
+            v-for="character in characters"
+            :key="character.id"
+            :character="character"
+            :room-tokens="{}"
+            :current-user-id="null"
+            :show-add-token="false"
+            :show-remove-token="false"
+            size="normal"
+            @view="handleViewCharacter"
+          />
+        </div>
       </div>
       
       <div style="display: flex; flex-direction: column; gap: 20px;">
@@ -125,6 +198,21 @@ async function handleLogout() {
         </div>
       </div>
     </div>
+
+    <!-- Модальное окно создания персонажа -->
+    <CreateCharacterModal
+      v-if="showCreateModal"
+      :server-url="serverUrl"
+      @close="showCreateModal = false"
+      @created="handleCharacterCreated"
+    />
+
+    <!-- Модальное окно просмотра персонажа -->
+    <CharacterViewModal
+      v-if="selectedCharacter"
+      :character="selectedCharacter"
+      @close="selectedCharacter = null"
+    />
   </div>
 </template>
 

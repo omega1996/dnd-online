@@ -217,6 +217,7 @@ function applyAction(room, action, socket) {
         src: payload.src ?? null,
         name: payload.name ?? "Token",
         ownerId: payload.ownerId ?? socket.id,
+        characterId: payload.characterId ?? null, // ID персонажа, если токен связан с персонажем
       };
       break;
     }
@@ -254,6 +255,9 @@ function applyAction(room, action, socket) {
       }
       if (payload.ownerId !== undefined) {
         token.ownerId = payload.ownerId;
+      }
+      if (payload.characterId !== undefined) {
+        token.characterId = payload.characterId;
       }
       if (typeof payload.gridX === "number") {
         token.gridX = payload.gridX;
