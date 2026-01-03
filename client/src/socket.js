@@ -1,5 +1,10 @@
 import { io } from "socket.io-client";
 
-export const socket = io("http://localhost:3001", {
-  autoConnect: false
+// Always use relative paths for Socket.io - nginx will proxy to server
+// This avoids CORS issues and works better with HTTPS
+const socketUrl = window.location.origin;
+
+export const socket = io(socketUrl, {
+  autoConnect: false,
+  path: "/socket.io/"
 });

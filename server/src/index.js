@@ -11,7 +11,74 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(cors());
+
+// CORS configuration
+// Allow requests from frontend domain and localhost for development
+const allowedOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+  : [
+      'https://dnd.omegasoft.keenetic.name',
+      'http://localhost',
+      'http://localhost:80',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000'
+    ];
+
+// CORS middleware - set headers for all requests
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const referer = req.headers.referer;
+  
+  // Try to determine origin from referer if origin header is missing
+  let requestOrigin = origin;
+  if (!requestOrigin && referer) {
+    try {
+      const refererUrl = new URL(referer);
+      requestOrigin = refererUrl.origin;
+    } catch (e) {
+      // Ignore
+    }
+  }
+  
+  // Default to allowing frontend domain if origin is missing
+  const defaultOrigin = 'https://dnd.omegasoft.keenetic.name';
+  
+  if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
+    console.log(`[CORS] Request from origin: ${requestOrigin} - allowing`);
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else if (!requestOrigin) {
+    // If no origin header, set default allowed origin for browser compatibility
+    console.log(`[CORS] Request with no origin header - setting default origin: ${defaultOrigin}`);
+    res.setHeader('Access-Control-Allow-Origin', defaultOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else if (process.env.NODE_ENV !== 'production') {
+    // Development mode - allow any origin
+    console.log(`[CORS] Development mode - allowing origin ${requestOrigin}`);
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else {
+    console.log(`[CORS] Origin ${requestOrigin} is NOT allowed`);
+    // Still set headers to avoid browser blocking, but use default origin
+    res.setHeader('Access-Control-Allow-Origin', defaultOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  
+  // Set other CORS headers
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log('[CORS] Handling preflight request');
+    res.status(204).end();
+    return;
+  }
+  
+  next();
+});
+
 app.use(express.json());
 
 // Создаем папку для загрузок если её нет
@@ -84,13 +151,41 @@ const uploadMap = multer({
   }
 });
 
-// Статическая раздача загруженных файлов
-app.use('/uploads', express.static(uploadsDir));
+// Статическая раздача загруженных файлов с CORS
+app.use('/uploads', (req, res, next) => {
+  // Set CORS headers for static files
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production')) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  next();
+}, express.static(uploadsDir));
 
 const server = http.createServer(app);
 
+// Socket.io CORS configuration
 const io = new Server(server, {
-  cors: { origin: true, credentials: true }
+  cors: {
+    origin: function (origin, callback) {
+      // Allow requests with no origin
+      if (!origin) return callback(null, true);
+      
+      // Check if origin is in allowed list
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        // For development, allow any origin
+        if (process.env.NODE_ENV !== 'production') {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST']
+  }
 });
 
 // В памяти: roomCode -> { createdAt, members: Map(socketId -> {name}), state, gmId }

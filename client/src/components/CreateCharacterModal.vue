@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import { useCharacters } from "../composables/useCharacters";
+import { buildApiUrl, buildAssetUrl } from "../utils/api.js";
 
 const props = defineProps({
   serverUrl: {
@@ -83,7 +84,7 @@ async function uploadImage(file) {
   const formData = new FormData();
   formData.append("image", file);
 
-  const response = await fetch(`${props.serverUrl}/upload-token-image`, {
+  const response = await fetch(buildApiUrl(props.serverUrl, "/upload-token-image"), {
     method: "POST",
     body: formData,
   });
@@ -96,7 +97,7 @@ async function uploadImage(file) {
   }
 
   const data = await response.json();
-  return `${props.serverUrl}${data.url}`;
+  return buildAssetUrl(props.serverUrl, data.url);
 }
 
 // Создание персонажа

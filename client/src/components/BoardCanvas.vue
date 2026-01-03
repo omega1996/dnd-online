@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import * as PIXI from 'pixi.js';
 import { useBoardState } from '../composables/useBoardState';
+import { buildAssetUrl } from '../utils/api.js';
 
 const props = defineProps({
   mapSrc: {
@@ -153,6 +154,9 @@ async function loadMap(src) {
   if (!worldContainer.value || !src || !app.value) return;
 
   try {
+    // Normalize URL: convert full URLs to relative paths to avoid Mixed Content issues
+    const normalizedSrc = buildAssetUrl('', src);
+    
     // Удаляем старую карту
     if (mapSprite.value) {
       worldContainer.value.removeChild(mapSprite.value);
@@ -161,7 +165,7 @@ async function loadMap(src) {
     }
 
     // Загружаем текстуру
-    const textureResource = await PIXI.Assets.load(src);
+    const textureResource = await PIXI.Assets.load(normalizedSrc);
     
     // Обрабатываем разные варианты возвращаемого значения
     let finalTexture;
@@ -205,7 +209,9 @@ async function loadTokenImage(tokenId, token) {
     return createDefaultTokenSprite();
   }
 
-  const src = token.src.trim();
+  let src = token.src.trim();
+  // Normalize URL: convert full URLs to relative paths to avoid Mixed Content issues
+  src = buildAssetUrl('', src);
   console.log(`[BoardCanvas] Loading token image for ${tokenId} from ${src}`);
 
   try {

@@ -2,11 +2,14 @@
   import { ref, computed } from "vue";
   import { socket } from "./socket";
   import { useAuth } from "./composables/useAuth";
+  import { buildApiUrl } from "./utils/api.js";
   import AuthScreen from "./components/AuthScreen.vue";
   import LoginScreen from "./components/LoginScreen.vue";
   import GameScreen from "./components/GameScreen.vue";
   
-  const serverUrl = "http://localhost:3001";
+  // Always use relative paths - nginx will proxy all requests to server
+  // This avoids CORS issues and works better with HTTPS
+  const serverUrl = "";
   
   // Авторизация
   const { user, loading: authLoading } = useAuth();
@@ -51,7 +54,12 @@
   }
   
   async function handleCreateRoom() {
-    const r = await fetch(`${serverUrl}/rooms`, { method: "POST" });
+    // Use buildApiUrl helper to avoid double slashes
+    const apiUrl = buildApiUrl(serverUrl, "/rooms");
+    const r = await fetch(apiUrl, { 
+      method: "POST",
+      credentials: 'include' // Include credentials for CORS
+    });
     const data = await r.json();
     roomCode.value = data.code;
     // После создания комнаты автоматически заполняем код, но не присоединяемся

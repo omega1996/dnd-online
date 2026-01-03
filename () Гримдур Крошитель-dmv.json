@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "player_name": null,
+  "character": [
+    {
+      "passive_perception": 12,
+      "immunities": [],
+      "subrace": "Hill Dwarf",
+      "ac": 16,
+      "saving_throw_advantages": null,
+      "proficiency_bonus": "2",
+      "race": "Dwarf",
+      "alignment": "Neutral Evil",
+      "experience": null,
+      "background": "",
+      "equipment": [
+        {
+          "equipment": {
+            "clothes-common": {
+              "id": 17592365100899,
+              "quantity": 1,
+              "equipped?": true,
+              "background-starting-equipment?": true
+            },
+            "pouch": {
+              "id": 17592365100901,
+              "quantity": 1,
+              "equipped?": true,
+              "background-starting-equipment?": true
+            },
+            "mule": {
+              "id": 17592365100903,
+              "quantity": 1,
+              "equipped?": true
+            },
+            "forgery-kit": {
+              "id": 17592365100905,
+              "quantity": 1,
+              "equipped?": true
+            }
+          },
+          "armor": {
+            "shield": {
+              "id": 17592365100926,
+              "quantity": 1,
+              "equipped?": true
+            }
+          },
+          "magic-armor": null,
+          "magic-items": null,
+          "weapons": [
+            [
+              "handaxe",
+              {
+                "id": 17592365100875,
+                "quantity": 1,
+                "equipped?": true
+              }
+            ],
+            [
+              "light-hammer",
+              {
+                "equipped?": true,
+                "quantity": 1
+              }
+            ],
+            [
+              "morningstar",
+              {
+                "id": 17592365100877,
+                "quantity": 1,
+                "equipped?": true
+              }
+            ],
+            [
+              "warhammer",
+              {
+                "equipped?": true,
+                "quantity": 1
+              }
+            ]
+          ],
+          "magic-weapons": []
+        }
+      ],
+      "spells": [
+        {
+          "spellcasting_fields": "TO-DO Spells. um yah... it's a nightmare to pull spells and details"
+        }
+      ],
+      "damage_resistances": [
+        {
+          "value": "poison",
+          "qualifier": null
+        }
+      ],
+      "treasure": {
+        "gp": 15,
+        "treasure": ""
+      },
+      "abilities_bonuses": [
+        {
+          "abilities": {
+            "str": 15,
+            "dex": 14,
+            "con": 15,
+            "int": 12,
+            "wis": 11,
+            "cha": 8
+          },
+          "bonuses": {
+            "str": 2,
+            "dex": 2,
+            "con": 2,
+            "int": 1,
+            "wis": 0,
+            "cha": -1
+          }
+        }
+      ],
+      "image_url": null,
+      "damage_vulnerabilities": null,
+      "proficiencies": [
+        {
+          "all": "Tool Proficiencies: Brewer's Supplies; Playing Card Set; Smith's Tools\n\nWeapon Proficiencies: Martial; Simple\n\nArmor Proficiencies: Light; Medium; Shields\n\nLanguage Proficiencies: Common; Dwarvish",
+          "tool": "Brewer's Supplies; Playing Card Set; Smith's Tools",
+          "weapon": "Martial; Simple",
+          "armor": "Light; Medium; Shields",
+          "language": "Common; Dwarvish"
+        }
+      ],
+      "skills": {
+        "religion": "+1",
+        "animal-handling-check": false,
+        "persuasion": "-1",
+        "sleight-of-hand-check": false,
+        "religion-check": false,
+        "nature-check": false,
+        "investigation": "+1",
+        "performance-check": false,
+        "acrobatics": "+2",
+        "performance": "-1",
+        "perception": "+2",
+        "sleight-of-hand": "+2",
+        "medicine-check": false,
+        "investigation-check": false,
+        "survival": "+2",
+        "history": "+1",
+        "history-check": false,
+        "animal-handling": "0",
+        "nature": "+1",
+        "deception": "-1",
+        "intimidation": "+1",
+        "arcana": "+1",
+        "athletics": "+4",
+        "perception-check": true,
+        "intimidation-check": true,
+        "survival-check": true,
+        "insight-check": false,
+        "stealth-check": false,
+        "deception-check": false,
+        "athletics-check": true,
+        "persuasion-check": false,
+        "arcana-check": false,
+        "acrobatics-check": false,
+        "insight": "0",
+        "medicine": "0",
+        "stealth": "+2"
+      },
+      "characteristics": [
+        {
+          "factions_and_organizations": null,
+          "faction_image_url": null,
+          "eyes": "brown",
+          "age": "67",
+          "sex": "male",
+          "ideals": "Личная выгода. Мир ничего ему не должен, но если уж он в нём живёт — возьмёт своё, даже если кому-то станет хуже.",
+          "speed": 25,
+          "personality-trait-2": "Недоверчив и язвителен, редко говорит прямо, предпочитая сарказм и чёрный юмор вместо откровенности.",
+          "bonds": "Клан Кровь-Камня. Каждый раз, когда я пью, вспоминаю, что был прав. Пью часто.",
+          "personality_trait_1": "Шутит в любой ситуации, особенно когда становится опасно; считает, что если смеётся он — значит, пока умирают не он.",
+          "weight": "95",
+          "hair": "black",
+          "skin": "light",
+          "height": "115",
+          "character_backstory": "Гримдур всегда был тем дворфом, который портит собрания.\nЗадает неудобные вопросы. Считает вслух. Не верит словам.\n\nКогда старейшина Брандек Медноликий начал рассказывать про «взаимовыгодный союз» с темными эльфами, Гримдур первым сказал:\n\n«Ну да, а потом они нас просто зарежут. С любовью».\n\nЕго не послушали.\n\nКогда он убил старейшину, он не кричал и не оправдывался.\nПросто сказал:\n\n«Потом вспомните мои слова».\n\nЕго изгнали.\n\nЧерез два года клан Кровь-Камня был уничтожен.\nГримдур выжил. Это он тоже считает плохой шуткой судьбы.\n\n🍺 Настоящее\n\nСейчас Гримдур — язвительный, неприятный, много пьющий дворф, который, \nшутит не к месту, улыбается перед дракой и использует юмор, чтобы не говорить о боли.\n\nОн может смеяться, рассказывать тупые истории и флиртовать,\nа через минуту — смотреть так, что люди вспоминают,\nзачем вообще придумали страх.\n\nОн не лезет в драку первым.\nОн дожидается, пока противник сам поймёт, что сделал глупость.\n\n🕷 Цель\n\nИмя он произносит с ухмылкой:\n\nВаларис Нокт’Шаар,\nглава клана темных эльфов.\n\n«Очень вежливый тип. Убил мой клан. Надо будет как-нибудь зайти в гости».\n\nГримдур не спешит.\nМесть — как хорошее пиво:\nесли торопиться, будет горчить.",
+          "flaws": "Алкоголь, похоть и ненависть к тёмным эльфам часто берут верх над здравым смыслом; если шутки заканчиваются — начинается настоящая жестокость."
+        }
+      ],
+      "save_bonuses": {
+        "str": 4,
+        "dex": 2,
+        "con": 4,
+        "int": 1,
+        "wis": 0,
+        "cha": -1
+      },
+      "character_name": "Гримдур Крошитель",
+      "attacks": {
+        "weapon-name-2": "Handaxe",
+        "weapon-attack-bonus-2": "+4",
+        "weapon-damage-1": "1d8+2 bludgeoning",
+        "weapon-damage-3": "1d8+2 piercing",
+        "weapon-name-1": "Warhammer",
+        "weapon-attack-bonus-3": "+4",
+        "attacks-and-spellcasting": "Number of Attacks: 1\nLight hammer. +4, 1d4+2 bludgeoning",
+        "weapon-name-3": "Morningstar",
+        "weapon-damage-2": "1d6+2 slashing",
+        "weapon-attack-bonus-1": "+4"
+      },
+      "hp": [
+        {
+          "hp_current": null,
+          "hp_max": 15
+        }
+      ],
+      "initiative_bonus": 2,
+      "classes": {
+        "barbarian": {
+          "class-name": "Barbarian",
+          "class-level": 1,
+          "hit-die": 12
+        }
+      },
+      "condition_immunities": [],
+      "traits": {
+        "features-and-traits-2": "Darkvision: 60 ft.\nDamage Resistances: poison\n\n----------Bonus Actions----------\nRage. Advantage on Strength checks and saves; melee damage bonus +2; resistance to bludgeoning, piercing, and slashing damage (lasts 1 minute, use twice/long rest).\n\n-----------Other Traits------------\nDwarven Resilience. Advantage on poison saves, resistance to poison damage.\n\nStonecunning. 2X prof bonus on stonework-related history checks."
+      }
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import CreateCharacterModal from "./CreateCharacterModal.vue";
 import CharacterCard from "./CharacterCard.vue";
 import GameLogs from "./GameLogs.vue";
 import DiceRoller from "./DiceRoller.vue";
+import { buildApiUrl, buildAssetUrl } from "../utils/api.js";
 
 const props = defineProps({
   serverUrl: {
@@ -138,7 +139,7 @@ async function uploadTokenImage(file) {
   const formData = new FormData();
   formData.append("image", file);
 
-  const response = await fetch(`${props.serverUrl}/upload-token-image`, {
+  const response = await fetch(buildApiUrl(props.serverUrl, "/upload-token-image"), {
     method: "POST",
     body: formData,
   });
@@ -159,7 +160,7 @@ async function uploadMapImage(file) {
   const formData = new FormData();
   formData.append("image", file);
 
-  const response = await fetch(`${props.serverUrl}/upload-map-image`, {
+  const response = await fetch(buildApiUrl(props.serverUrl, "/upload-map-image"), {
     method: "POST",
     body: formData,
   });
@@ -191,7 +192,7 @@ async function handleAddToken() {
     const imageUrl = await uploadTokenImage(newTokenFile.value);
 
     // Полный URL для доступа к файлу
-    const fullImageUrl = `${props.serverUrl}${imageUrl}`;
+    const fullImageUrl = buildAssetUrl(props.serverUrl, imageUrl);
 
     const tokenId = generateTokenId();
     // Позиция на сетке (0, 0) - начальная позиция
@@ -277,7 +278,7 @@ async function handleSetMap() {
     const imageUrl = await uploadMapImage(newMapFile.value);
 
     // Полный URL для доступа к файлу
-    const fullImageUrl = `${props.serverUrl}${imageUrl}`;
+    const fullImageUrl = buildAssetUrl(props.serverUrl, imageUrl);
 
     // Отправляем действие установки карты с параметрами сетки
     sendAction("MAP_SET", { 
