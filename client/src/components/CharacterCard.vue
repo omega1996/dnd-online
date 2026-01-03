@@ -34,7 +34,51 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["view", "add-token", "remove-token"]);
+const emit = defineEmits(["view", "add-token", "remove-token", "hide-token", "show-token"]);
+
+// Получаем имя персонажа (player_name или name для обратной совместимости)
+const characterName = computed(() => {
+  return props.character?.player_name || props.character?.name || "Unknown";
+});
+
+// Получаем imageUrl из правильного места
+const imageUrl = computed(() => {
+  return props.character?.imageUrl || 
+         props.character?.characterData?.character?.[0]?.image_url || 
+         null;
+});
+
+// Получаем abilities_bonuses для отображения
+const abilitiesDisplay = computed(() => {
+  // Если есть новая структура DND
+  if (props.character?.characterData?.character?.[0]?.abilities_bonuses?.[0]) {
+    const ab = props.character.characterData.character[0].abilities_bonuses[0];
+    const abilities = ab.abilities || {};
+    const bonuses = ab.bonuses || {};
+    
+    // Форматируем как: STR: 8(-1) DEX: 12(+1) CON: 14(+2) INT: 14(+2) WIS: 10(0) CHA: 17(+3)
+    const formatStat = (key, value, bonus) => {
+      const bonusStr = bonus >= 0 ? `+${bonus}` : `${bonus}`;
+      return `${key.toUpperCase()}: ${value}(${bonusStr})`;
+    };
+    
+    return [
+      formatStat('STR', abilities.str || 0, bonuses.str || 0),
+      formatStat('DEX', abilities.dex || 0, bonuses.dex || 0),
+      formatStat('CON', abilities.con || 0, bonuses.con || 0),
+      formatStat('INT', abilities.int || 0, bonuses.int || 0),
+      formatStat('WIS', abilities.wis || 0, bonuses.wis || 0),
+      formatStat('CHA', abilities.cha || 0, bonuses.cha || 0),
+    ].join(' | ');
+  }
+  
+  // Обратная совместимость со старой структурой
+  if (props.character?.stats) {
+    return `HP: ${props.character.stats.health || 0} | AGI: ${props.character.stats.agility || 0} | STR: ${props.character.stats.strength || 0} | INT: ${props.character.stats.intelligence || 0}`;
+  }
+  
+  return "No stats available";
+});
 
 // Проверяем, есть ли токен этого персонажа на текущей доске
 const isOnBoard = computed(() => {
@@ -64,6 +108,22 @@ const isTokenOwner = computed(() => {
     return false;
   }
   return tokenOnBoard.value.ownerId === props.currentUserId;
+});
+
+// Получаем hit points токена, если он на доске
+const tokenHitPoints = computed(() => {
+  if (!tokenOnBoard.value) {
+    return null;
+  }
+  return tokenOnBoard.value.hitPoints;
+});
+
+// Проверяем, скрыт ли токен
+const isTokenHidden = computed(() => {
+  if (!tokenOnBoard.value) {
+    return false;
+  }
+  return tokenOnBoard.value.hidden === true;
 });
 
 // Размеры изображения в зависимости от размера карточки
@@ -114,6 +174,18 @@ function handleRemoveToken() {
     emit("remove-token", tokenOnBoard.value.id);
   }
 }
+
+function handleHideToken() {
+  if (tokenOnBoard.value) {
+    emit("hide-token", tokenOnBoard.value.id);
+  }
+}
+
+function handleShowToken() {
+  if (tokenOnBoard.value) {
+    emit("show-token", tokenOnBoard.value.id);
+  }
+}
 </script>
 
 <template>
@@ -129,9 +201,9 @@ function handleRemoveToken() {
     }"
   >
     <img
-      v-if="character.imageUrl"
-      :src="character.imageUrl"
-      :alt="character.name"
+      v-if="imageUrl"
+      :src="imageUrl"
+      :alt="characterName"
       :style="{
         width: imageSize,
         height: imageSize,
@@ -141,7 +213,7 @@ function handleRemoveToken() {
         cursor: 'pointer',
       }"
       @click="handleView"
-      :title="'Click to view ' + character.name"
+      :title="'Click to view ' + characterName"
     />
     <div :style="{ flex: size === 'compact' ? '1 1 0' : '1', minWidth: 0 }">
       <div
@@ -153,7 +225,7 @@ function handleRemoveToken() {
         }"
         @click="handleView"
       >
-        {{ character.name }}
+        {{ characterName }}
       </div>
       <div
         :style="{
@@ -161,8 +233,7 @@ function handleRemoveToken() {
           color: '#666',
         }"
       >
-        HP: {{ character.stats?.health || 0 }} | AGI: {{ character.stats?.agility || 0 }} | STR:
-        {{ character.stats?.strength || 0 }} | INT: {{ character.stats?.intelligence || 0 }}
+        {{ abilitiesDisplay }}
       </div>
       <div
         v-if="isOnBoard"
@@ -173,6 +244,9 @@ function handleRemoveToken() {
         }"
       >
         ✓ On board
+        <span v-if="tokenHitPoints !== null" :style="{ marginLeft: '8px', fontWeight: 600 }">
+          HP: {{ tokenHitPoints }}
+        </span>
       </div>
     </div>
     <div
@@ -217,6 +291,23 @@ function handleRemoveToken() {
       </button>
       <button
         v-if="showRemoveToken && isOnBoard && isTokenOwner"
+        @click="isTokenHidden ? handleShowToken() : handleHideToken()"
+        :style="{
+          padding: size === 'compact' ? '4px 8px' : '6px 12px',
+          borderRadius: '4px',
+          border: '1px solid #ccc',
+          background: 'white',
+          color: '#666',
+          cursor: 'pointer',
+          fontSize: size === 'compact' ? '11px' : '12px',
+          whiteSpace: 'nowrap',
+        }"
+        :title="isTokenHidden ? 'Show token on board' : 'Hide token from board'"
+      >
+        {{ isTokenHidden ? 'Show' : 'Hide' }}
+      </button>
+      <button
+        v-if="showRemoveToken && isOnBoard && isTokenOwner"
         @click="handleRemoveToken"
         :style="{
           padding: size === 'compact' ? '4px 8px' : '6px 12px',
@@ -228,7 +319,7 @@ function handleRemoveToken() {
           fontSize: size === 'compact' ? '11px' : '12px',
           whiteSpace: 'nowrap',
         }"
-        title="Remove token from board"
+        title="Remove token from board (death)"
       >
         Remove
       </button>

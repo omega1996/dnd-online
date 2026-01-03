@@ -15,17 +15,14 @@ const { createCharacter, loading } = useCharacters();
 
 const name = ref("");
 const imageFile = ref(null);
+const jsonFile = ref(null);
+const characterData = ref(null);
 const isUploading = ref(false);
-const stats = ref({
-  health: 100,
-  agility: 10,
-  strength: 10,
-  intelligence: 10,
-});
+const useJsonData = ref(false);
 
 const error = ref(null);
 
-// Обработчик выбора файла
+// Обработчик выбора изображения
 function handleFileSelect(event) {
   const file = event.target.files?.[0];
   if (file) {
@@ -41,6 +38,43 @@ function handleFileSelect(event) {
     }
     imageFile.value = file;
     error.value = null;
+  }
+}
+
+// Обработчик выбора JSON файла
+async function handleJsonFileSelect(event) {
+  const file = event.target.files?.[0];
+  if (file) {
+    if (!file.name.endsWith('.json')) {
+      error.value = "Please select a JSON file";
+      event.target.value = "";
+      return;
+    }
+    
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      
+      // Проверяем структуру
+      if (!parsed.player_name || !parsed.character || !Array.isArray(parsed.character) || parsed.character.length === 0) {
+        error.value = "Invalid DND character JSON structure";
+        event.target.value = "";
+        return;
+      }
+      
+      jsonFile.value = file;
+      characterData.value = parsed;
+      useJsonData.value = true;
+      
+      // Автоматически заполняем имя из player_name
+      name.value = parsed.player_name;
+      
+      error.value = null;
+    } catch (err) {
+      error.value = "Failed to parse JSON file: " + err.message;
+      event.target.value = "";
+      return;
+    }
   }
 }
 
@@ -86,27 +120,39 @@ async function handleCreate() {
     // Загружаем изображение
     const imageUrl = await uploadImage(imageFile.value);
 
-    // Создаем персонажа
-    await createCharacter({
-      name: name.value.trim(),
-      imageUrl,
-      stats: {
-        health: parseInt(stats.value.health) || 100,
-        agility: parseInt(stats.value.agility) || 10,
-        strength: parseInt(stats.value.strength) || 10,
-        intelligence: parseInt(stats.value.intelligence) || 10,
-      },
-    });
+    // Если используется JSON данные, сохраняем полную структуру
+    if (useJsonData.value && characterData.value) {
+      // Обновляем image_url в character данных, если есть
+      if (characterData.value.character && characterData.value.character[0]) {
+        characterData.value.character[0].image_url = imageUrl;
+      }
+      
+      // Сохраняем полную структуру DND
+      await createCharacter({
+        player_name: name.value.trim(),
+        characterData: characterData.value,
+        imageUrl,
+      });
+    } else {
+      // Старый способ создания (для обратной совместимости)
+      await createCharacter({
+        name: name.value.trim(),
+        imageUrl,
+        stats: {
+          health: 100,
+          agility: 10,
+          strength: 10,
+          intelligence: 10,
+        },
+      });
+    }
 
     // Очищаем форму
     name.value = "";
     imageFile.value = null;
-    stats.value = {
-      health: 100,
-      agility: 10,
-      strength: 10,
-      intelligence: 10,
-    };
+    jsonFile.value = null;
+    characterData.value = null;
+    useJsonData.value = false;
     error.value = null;
 
     emit("created");
@@ -122,12 +168,9 @@ async function handleCreate() {
 function handleClose() {
   name.value = "";
   imageFile.value = null;
-  stats.value = {
-    health: 100,
-    agility: 10,
-    strength: 10,
-    intelligence: 10,
-  };
+  jsonFile.value = null;
+  characterData.value = null;
+  useJsonData.value = false;
   error.value = null;
   emit("close");
 }
@@ -238,68 +281,37 @@ function handleClose() {
         </label>
 
         <div style="border-top: 1px solid #eee; padding-top: 16px">
-          <h3 style="margin: 0 0 12px 0; font-size: 16px">Stats</h3>
-          <div style="display: flex; flex-direction: column; gap: 12px">
-            <label style="display: flex; flex-direction: column; gap: 4px">
-              <span style="font-weight: 500">Health</span>
-              <input
-                v-model.number="stats.health"
-                type="number"
-                min="1"
-                style="
-                  padding: 8px;
-                  border: 1px solid #ccc;
-                  border-radius: 6px;
-                  font-size: 14px;
-                "
-              />
-            </label>
-
-            <label style="display: flex; flex-direction: column; gap: 4px">
-              <span style="font-weight: 500">Agility</span>
-              <input
-                v-model.number="stats.agility"
-                type="number"
-                min="1"
-                style="
-                  padding: 8px;
-                  border: 1px solid #ccc;
-                  border-radius: 6px;
-                  font-size: 14px;
-                "
-              />
-            </label>
-
-            <label style="display: flex; flex-direction: column; gap: 4px">
-              <span style="font-weight: 500">Strength</span>
-              <input
-                v-model.number="stats.strength"
-                type="number"
-                min="1"
-                style="
-                  padding: 8px;
-                  border: 1px solid #ccc;
-                  border-radius: 6px;
-                  font-size: 14px;
-                "
-              />
-            </label>
-
-            <label style="display: flex; flex-direction: column; gap: 4px">
-              <span style="font-weight: 500">Intelligence</span>
-              <input
-                v-model.number="stats.intelligence"
-                type="number"
-                min="1"
-                style="
-                  padding: 8px;
-                  border: 1px solid #ccc;
-                  border-radius: 6px;
-                  font-size: 14px;
-                "
-              />
-            </label>
-          </div>
+          <h3 style="margin: 0 0 12px 0; font-size: 16px">DND Character Data (Optional)</h3>
+          <label style="display: flex; flex-direction: column; gap: 4px">
+            <span style="font-weight: 500">Load DND Character JSON</span>
+            <input
+              type="file"
+              accept=".json"
+              @change="handleJsonFileSelect"
+              :disabled="isUploading"
+              style="
+                padding: 8px;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+                font-size: 13px;
+              "
+            />
+            <small style="color: #666; font-size: 12px">
+              Upload a DND character JSON file generated by the character generator
+            </small>
+            <small
+              v-if="jsonFile"
+              style="color: #28a745; font-size: 12px; margin-top: 4px"
+            >
+              Loaded: {{ jsonFile.name }} ({{ (jsonFile.size / 1024).toFixed(1) }} KB)
+            </small>
+            <small
+              v-if="useJsonData && characterData"
+              style="color: #007bff; font-size: 12px; margin-top: 4px"
+            >
+              Character: {{ characterData.character?.[0]?.character_name || 'Unknown' }}
+            </small>
+          </label>
         </div>
 
         <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px">

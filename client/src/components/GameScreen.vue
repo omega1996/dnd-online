@@ -41,7 +41,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["leave", "token-move", "action", "character-token-added"]);
+const emit = defineEmits(["leave", "token-move", "action", "character-token-added", "hide-token", "show-token"]);
 
 // Авторизация
 const { logout } = useAuth();
@@ -51,6 +51,10 @@ const { characters, fetchCharacters, loading: charactersLoading } = useCharacter
 const selectedCharacter = ref(null);
 const loadingCharacter = ref(false);
 const showCreateCharacterModal = ref(false);
+
+// Модальное окно подтверждения удаления токена
+const showDeleteTokenModal = ref(false);
+const tokenToDelete = ref(null);
 
 // Форма добавления токена (для мастера)
 const showAddTokenForm = ref(false);
@@ -328,7 +332,12 @@ function handleViewCharacter(character) {
 
 // Обработчик добавления токена персонажа
 function handleAddCharacterToken(character) {
-  if (!character || !character.imageUrl) {
+  // Получаем imageUrl из правильного места
+  const characterImageUrl = character?.imageUrl || 
+                            character?.characterData?.character?.[0]?.image_url || 
+                            null;
+  
+  if (!character || !characterImageUrl) {
     console.error("Character data is missing");
     return;
   }
@@ -340,14 +349,28 @@ function handleAddCharacterToken(character) {
   const gridX = 0;
   const gridY = 0;
 
+  // Получаем имя персонажа из новой структуры или старой
+  const characterName = character?.player_name || 
+                       character?.characterData?.character?.[0]?.character_name || 
+                       character?.name || 
+                       "Unknown";
+
+  // Получаем hit points из структуры персонажа
+  let hitPoints = null;
+  if (character?.characterData?.character?.[0]?.hp?.[0]) {
+    const hpData = character.characterData.character[0].hp[0];
+    hitPoints = hpData.hp_current !== null ? hpData.hp_current : hpData.hp_max;
+  }
+
   const payload = {
     id: tokenId,
     gridX,
     gridY,
-    src: character.imageUrl,
-    name: character.name,
+    src: characterImageUrl,
+    name: characterName,
     ownerId: props.me,
     characterId: character.id, // Сохраняем ID персонажа в токене
+    hitPoints: hitPoints, // Сохраняем hit points токена
   };
 
   // Отправляем действие на сервер - токен будет добавлен в roomState.tokens
@@ -355,7 +378,7 @@ function handleAddCharacterToken(character) {
   // Не нужно обновлять Firebase - состояние токена хранится только на сервере
 }
 
-// Обработчик удаления токена с доски
+// Обработчик удаления токена с доски (показывает модальное окно подтверждения)
 function handleRemoveCharacterToken(tokenId) {
   if (!tokenId) {
     console.error("Token ID is missing");
@@ -375,9 +398,77 @@ function handleRemoveCharacterToken(tokenId) {
     return;
   }
   
+  // Показываем модальное окно подтверждения
+  tokenToDelete.value = tokenId;
+  showDeleteTokenModal.value = true;
+}
+
+// Подтверждение удаления токена
+function confirmDeleteToken() {
+  if (!tokenToDelete.value) {
+    return;
+  }
+  
   // Удаляем токен с доски - отправляем действие на сервер
-  sendAction("TOKEN_REMOVE", { id: tokenId });
-  // Не нужно обновлять Firebase - состояние токена хранится только на сервере
+  sendAction("TOKEN_REMOVE", { id: tokenToDelete.value });
+  
+  // Закрываем модальное окно
+  showDeleteTokenModal.value = false;
+  tokenToDelete.value = null;
+}
+
+// Отмена удаления токена
+function cancelDeleteToken() {
+  showDeleteTokenModal.value = false;
+  tokenToDelete.value = null;
+}
+
+// Обработчик скрытия токена
+function handleHideCharacterToken(tokenId) {
+  if (!tokenId) {
+    console.error("Token ID is missing");
+    return;
+  }
+
+  // Находим токен на доске
+  const token = tokens.value[tokenId];
+  if (!token) {
+    console.error("Token not found on board");
+    return;
+  }
+
+  // Проверяем, что токен принадлежит текущему пользователю
+  if (token.ownerId !== props.me) {
+    console.error("Cannot hide token: not owner");
+    return;
+  }
+  
+  // Скрываем токен - отправляем действие на сервер
+  sendAction("TOKEN_HIDE", { id: tokenId });
+}
+
+// Обработчик показа токена
+function handleShowCharacterToken(tokenId) {
+  if (!tokenId) {
+    console.error("Token ID is missing");
+    return;
+  }
+
+  // Находим токен на доске
+  const token = tokens.value[tokenId];
+  if (!token) {
+    console.error("Token not found on board");
+    return;
+  }
+
+  // Проверяем, что токен принадлежит текущему пользователю
+  if (token.ownerId !== props.me) {
+    console.error("Cannot show token: not owner");
+    return;
+  }
+  
+  // Показываем токен - отправляем действие на сервер
+  sendAction("TOKEN_SHOW", { id: tokenId });
 }
 
 // Загружаем персонажей при монтировании
@@ -858,6 +949,8 @@ onUnmounted(() => {
               @view="handleViewCharacter"
               @add-token="handleAddCharacterToken"
               @remove-token="handleRemoveCharacterToken"
+              @hide-token="handleHideCharacterToken"
+              @show-token="handleShowCharacterToken"
             />
           </div>
         </div>
@@ -919,6 +1012,7 @@ onUnmounted(() => {
     <CharacterViewModal
       v-if="selectedCharacter"
       :character="selectedCharacter"
+      :room-tokens="tokens"
       @close="selectedCharacter = null"
     />
 
@@ -929,6 +1023,72 @@ onUnmounted(() => {
       @close="showCreateCharacterModal = false"
       @created="handleCharacterCreated"
     />
+
+    <!-- Модальное окно подтверждения удаления токена -->
+    <div
+      v-if="showDeleteTokenModal"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      "
+      @click.self="cancelDeleteToken"
+    >
+      <div
+        style="
+          background: white;
+          border-radius: 12px;
+          padding: 24px;
+          max-width: 400px;
+          width: 90%;
+        "
+      >
+        <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600">
+          Удалить токен с доски?
+        </h3>
+        <p style="margin: 0 0 24px 0; color: #666; font-size: 14px; line-height: 1.5">
+          Вы действительно хотите удалить токен с доски? Это равносильно смерти персонажа.
+        </p>
+        <div style="display: flex; gap: 12px; justify-content: flex-end">
+          <button
+            @click="cancelDeleteToken"
+            style="
+              padding: 10px 20px;
+              border-radius: 6px;
+              border: 1px solid #ccc;
+              background: white;
+              cursor: pointer;
+              font-weight: 500;
+              font-size: 14px;
+            "
+          >
+            Отмена
+          </button>
+          <button
+            @click="confirmDeleteToken"
+            style="
+              padding: 10px 20px;
+              border-radius: 6px;
+              border: none;
+              background: #dc3545;
+              color: white;
+              cursor: pointer;
+              font-weight: 500;
+              font-size: 14px;
+            "
+          >
+            Удалить
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 

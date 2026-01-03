@@ -100,7 +100,7 @@ function createRoomState() {
   return {
     version: 1,
     map: { src: null, grid: { rows: 10, columns: 10, enabled: true } },
-    tokens: {}, // tokenId -> { id, gridX, gridY, src, name, ownerId }
+    tokens: {}, // tokenId -> { id, gridX, gridY, src, name, ownerId, characterId, hitPoints, hidden }
     logs: [], // Массив логов: [{ id, type, timestamp, data, userId, userName }]
     meta: { createdAt: Date.now() },
   };
@@ -142,7 +142,9 @@ function hasPermission(room, action, socketId) {
 
     case "TOKEN_MOVE":
     case "TOKEN_UPDATE":
-      // Player может двигать/обновлять только свои токены
+    case "TOKEN_HIDE":
+    case "TOKEN_SHOW":
+      // Player может двигать/обновлять/скрывать/показывать только свои токены
       if (!payload || !payload.id) return false;
       const token = room.state.tokens[payload.id];
       if (!token) return false;
@@ -263,6 +265,8 @@ function applyAction(room, action, socket) {
         name: payload.name ?? "Token",
         ownerId: payload.ownerId ?? socket.id,
         characterId: payload.characterId ?? null, // ID персонажа, если токен связан с персонажем
+        hitPoints: payload.hitPoints ?? null, // Текущие hit points токена
+        hidden: payload.hidden ?? false, // Скрыт ли токен
       };
       room.state.tokens[payload.id] = token;
       // Добавляем лог добавления токена
@@ -334,12 +338,64 @@ function applyAction(room, action, socket) {
       if (payload.characterId !== undefined) {
         token.characterId = payload.characterId;
       }
+      if (payload.hitPoints !== undefined) {
+        token.hitPoints = payload.hitPoints;
+      }
+      if (payload.hidden !== undefined) {
+        token.hidden = payload.hidden;
+      }
       if (typeof payload.gridX === "number") {
         token.gridX = payload.gridX;
       }
       if (typeof payload.gridY === "number") {
         token.gridY = payload.gridY;
       }
+      break;
+    }
+
+    case "TOKEN_HIDE": {
+      if (!payload || !payload.id || typeof payload.id !== "string") {
+        return { ok: false, error: "INVALID_PAYLOAD" };
+      }
+      const token = room.state.tokens[payload.id];
+      if (!token) {
+        return { ok: false, error: "TOKEN_NOT_FOUND" };
+      }
+      token.hidden = true;
+      // Добавляем лог скрытия токена с именем персонажа
+      addLog(
+        room,
+        "token_hide",
+        {
+          tokenId: token.id,
+          tokenName: token.name,
+        },
+        socket.id,
+        userName
+      );
+      break;
+    }
+
+    case "TOKEN_SHOW": {
+      if (!payload || !payload.id || typeof payload.id !== "string") {
+        return { ok: false, error: "INVALID_PAYLOAD" };
+      }
+      const token = room.state.tokens[payload.id];
+      if (!token) {
+        return { ok: false, error: "TOKEN_NOT_FOUND" };
+      }
+      token.hidden = false;
+      // Добавляем лог показа токена
+      addLog(
+        room,
+        "token_show",
+        {
+          tokenId: token.id,
+          tokenName: token.name,
+        },
+        socket.id,
+        userName
+      );
       break;
     }
 

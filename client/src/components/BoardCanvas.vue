@@ -307,6 +307,18 @@ async function updateTokens() {
   // Добавляем/обновляем токены
   for (const [tokenId, token] of Object.entries(props.tokens)) {
     console.log(`[BoardCanvas] Processing token ${tokenId}:`, token);
+    
+    // Пропускаем скрытые токены
+    if (token.hidden === true) {
+      // Если спрайт существует и видим, скрываем его
+      const sprite = tokenSprites.value.get(tokenId);
+      if (sprite && sprite.parent === worldContainer.value) {
+        worldContainer.value.removeChild(sprite);
+        console.log(`[BoardCanvas] Hiding token ${tokenId}`);
+      }
+      continue;
+    }
+    
     let sprite = tokenSprites.value.get(tokenId);
     
     if (!sprite) {
@@ -335,9 +347,9 @@ async function updateTokens() {
       // Настраиваем drag для нового токена
       setupTokenDrag(sprite);
     } else {
-      // Проверяем, что спрайт добавлен в контейнер
+      // Проверяем, что спрайт добавлен в контейнер (если токен не скрыт)
       if (sprite.parent !== worldContainer.value) {
-        console.warn(`[BoardCanvas] Sprite for token ${tokenId} exists but not in container, adding it`);
+        console.log(`[BoardCanvas] Showing token ${tokenId} - adding sprite back to container`);
         worldContainer.value.addChild(sprite);
       }
       

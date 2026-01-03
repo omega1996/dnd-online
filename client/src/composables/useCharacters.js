@@ -19,6 +19,63 @@ const characters = ref([]);
 const loading = ref(false);
 const error = ref(null);
 
+// Преобразование вложенных массивов в объекты для Firestore
+function arraysToObjects(obj) {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    const result = {};
+    obj.forEach((item, index) => {
+      result[index.toString()] = arraysToObjects(item);
+    });
+    return result;
+  }
+  
+  if (typeof obj === 'object' && obj.constructor === Object) {
+    const result = {};
+    Object.keys(obj).forEach(key => {
+      result[key] = arraysToObjects(obj[key]);
+    });
+    return result;
+  }
+  
+  return obj;
+}
+
+// Преобразование объектов обратно в массивы при чтении из Firestore
+function objectsToArrays(obj) {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  if (typeof obj === 'object' && obj.constructor === Object) {
+    // Проверяем, является ли это объектом-массивом (все ключи - числа)
+    const keys = Object.keys(obj);
+    const isArrayLike = keys.length > 0 && keys.every(key => /^\d+$/.test(key));
+    
+    if (isArrayLike) {
+      // Преобразуем в массив
+      const maxIndex = Math.max(...keys.map(k => parseInt(k)));
+      const result = [];
+      for (let i = 0; i <= maxIndex; i++) {
+        result[i] = objectsToArrays(obj[i.toString()]);
+      }
+      return result;
+    } else {
+      // Обычный объект
+      const result = {};
+      Object.keys(obj).forEach(key => {
+        result[key] = objectsToArrays(obj[key]);
+      });
+      return result;
+    }
+  }
+  
+  return obj;
+}
+
 // Получить всех персонажей текущего пользователя
 async function fetchCharacters() {
   if (!user.value) {
@@ -38,10 +95,17 @@ async function fetchCharacters() {
     );
     
     const querySnapshot = await getDocs(q);
-    characters.value = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    characters.value = querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      // Преобразуем объекты обратно в массивы при чтении
+      if (data.characterData) {
+        data.characterData = objectsToArrays(data.characterData);
+      }
+      return {
+        id: doc.id,
+        ...data,
+      };
+    });
   } catch (err) {
     console.error("Error fetching characters:", err);
     error.value = err.message;
@@ -61,20 +125,40 @@ async function createCharacter(characterData) {
 
   try {
     const charactersRef = collection(db, "characters");
-    const newCharacter = {
-      userId: user.value.uid,
-      name: characterData.name,
-      imageUrl: characterData.imageUrl,
-      stats: {
-        health: characterData.stats?.health || 100,
-        agility: characterData.stats?.agility || 10,
-        strength: characterData.stats?.strength || 10,
-        intelligence: characterData.stats?.intelligence || 10,
-      },
-      tokenId: null, // ID токена на доске (если добавлен)
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    
+    // Если передана полная структура DND (characterData.characterData), используем её
+    let newCharacter;
+    if (characterData.characterData) {
+      // Преобразуем вложенные массивы в объекты для Firestore
+      const characterDataForFirestore = arraysToObjects(characterData.characterData);
+      
+      // Сохраняем полную структуру DND
+      newCharacter = {
+        userId: user.value.uid,
+        player_name: characterData.player_name || characterData.name,
+        characterData: characterDataForFirestore,
+        imageUrl: characterData.imageUrl,
+        tokenId: null, // ID токена на доске (если добавлен)
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    } else {
+      // Обратная совместимость со старой структурой
+      newCharacter = {
+        userId: user.value.uid,
+        name: characterData.name,
+        imageUrl: characterData.imageUrl,
+        stats: {
+          health: characterData.stats?.health || 100,
+          agility: characterData.stats?.agility || 10,
+          strength: characterData.stats?.strength || 10,
+          intelligence: characterData.stats?.intelligence || 10,
+        },
+        tokenId: null, // ID токена на доске (если добавлен)
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
 
     const docRef = await addDoc(charactersRef, newCharacter);
     await fetchCharacters(); // Обновляем список
@@ -110,8 +194,14 @@ async function updateCharacter(characterId, updates) {
       throw new Error("Permission denied");
     }
 
+    // Преобразуем вложенные массивы в объекты для Firestore, если есть characterData в updates
+    const updatesForFirestore = { ...updates };
+    if (updatesForFirestore.characterData) {
+      updatesForFirestore.characterData = arraysToObjects(updatesForFirestore.characterData);
+    }
+
     await updateDoc(characterRef, {
-      ...updates,
+      ...updatesForFirestore,
       updatedAt: new Date(),
     });
 
@@ -177,6 +267,11 @@ async function getCharacterById(characterId) {
       throw new Error("Permission denied");
     }
 
+    // Преобразуем объекты обратно в массивы при чтении
+    if (characterData.characterData) {
+      characterData.characterData = objectsToArrays(characterData.characterData);
+    }
+
     return {
       id: characterDoc.id,
       ...characterData,
@@ -208,6 +303,11 @@ async function getCharacterByTokenId(tokenId) {
 
     const characterDoc = querySnapshot.docs[0];
     const characterData = characterDoc.data();
+    
+    // Преобразуем объекты обратно в массивы при чтении
+    if (characterData.characterData) {
+      characterData.characterData = objectsToArrays(characterData.characterData);
+    }
     
     // Проверяем, что персонаж принадлежит текущему пользователю или доступен всем
     // Для начала сделаем доступным всем, кто может видеть токен

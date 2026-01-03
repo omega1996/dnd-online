@@ -11,6 +11,8 @@ export function useGameLogs(logsRef) {
     map_change: true,
     token_add: true,
     token_remove: true,
+    token_hide: true,
+    token_show: true,
   });
 
   // Переключение фильтра по типу
@@ -36,6 +38,8 @@ export function useGameLogs(logsRef) {
       map_change: 'Смена карты',
       token_add: 'Добавление токена',
       token_remove: 'Удаление токена',
+      token_hide: 'Скрытие токена',
+      token_show: 'Показ токена',
     };
     return labels[type] || type;
   }

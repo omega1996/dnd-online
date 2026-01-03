@@ -7,17 +7,29 @@ service cloud.firestore {
       // Это нужно для просмотра характеристик по tokenId
       allow read: if request.auth != null;
       
+      // Вспомогательная функция для проверки структуры персонажа
+      function isValidCharacterData() {
+        let hasUserId = request.resource.data.userId == request.auth.uid;
+        let hasImageUrl = request.resource.data.imageUrl is string;
+        
+        // Проверяем новую структуру DND (player_name + characterData)
+        let hasNewStructure = request.resource.data.player_name is string
+          && request.resource.data.characterData is map;
+        
+        // Проверяем старую структуру (name + stats) для обратной совместимости
+        let hasOldStructure = request.resource.data.name is string
+          && request.resource.data.stats is map
+          && request.resource.data.stats.health is int
+          && request.resource.data.stats.agility is int
+          && request.resource.data.stats.strength is int
+          && request.resource.data.stats.intelligence is int;
+        
+        return hasUserId && hasImageUrl && (hasNewStructure || hasOldStructure);
+      }
+      
       // Разрешаем создание персонажа авторизованным пользователям
-      // userId должен совпадать с текущим пользователем
-      allow create: if request.auth != null 
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.name is string
-        && request.resource.data.imageUrl is string
-        && request.resource.data.stats is map
-        && request.resource.data.stats.health is int
-        && request.resource.data.stats.agility is int
-        && request.resource.data.stats.strength is int
-        && request.resource.data.stats.intelligence is int;
+      // Поддерживаем как новую структуру DND, так и старую для обратной совместимости
+      allow create: if request.auth != null && isValidCharacterData();
       
       // Разрешаем обновление только своих персонажей
       allow update: if request.auth != null 

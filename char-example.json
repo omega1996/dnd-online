@@ -1,0 +1,273 @@
+{
+    "schema_version": 1,
+    "player_name": "Nastya",
+    "character": [
+      {
+        "passive_perception": 12,
+        "immunities": [],
+        "subrace": "",
+        "ac": 12,
+        "saving_throw_advantages": null,
+        "proficiency_bonus": "2",
+        "race": "Tiefling",
+        "alignment": "Chaotic Good",
+        "experience": null,
+        "background": null,
+        "equipment": [
+          {
+            "equipment": {
+              "soap": {
+                "quantity": 1,
+                "equipped?": true
+              },
+              "oil": {
+                "quantity": 2,
+                "equipped?": true
+              },
+              "disguise-kit": {
+                "id": 17592365093610,
+                "quantity": 1,
+                "equipped?": true,
+                "background-starting-equipment?": true
+              },
+              "book": {
+                "id": 17592365093618,
+                "quantity": 1,
+                "equipped?": true,
+                "background-starting-equipment?": true
+              },
+              "case-map-or-scroll": {
+                "quantity": 1,
+                "equipped?": true
+              },
+              "paper": {
+                "quantity": 5,
+                "equipped?": true
+              },
+              "rations-1-day-": {
+                "id": 17592365093620,
+                "quantity": 1,
+                "equipped?": true,
+                "background-starting-equipment?": true
+              },
+              "perfume": {
+                "quantity": 1,
+                "equipped?": true
+              },
+              "magnifying-glass": {
+                "id": 17592365093612,
+                "quantity": 1,
+                "equipped?": true,
+                "background-starting-equipment?": true
+              },
+              "ink-pen": {
+                "quantity": 1,
+                "equipped?": true
+              },
+              "chest": {
+                "quantity": 1,
+                "equipped?": true
+              },
+              "lamp": {
+                "quantity": 1,
+                "equipped?": true
+              },
+              "clothes-fine": {
+                "quantity": 1,
+                "equipped?": true
+              },
+              "sealing-wax": {
+                "quantity": 1,
+                "equipped?": true
+              },
+              "lute": {
+                "quantity": 1,
+                "equipped?": true
+              },
+              "ink": {
+                "quantity": 1,
+                "equipped?": true
+              }
+            },
+            "armor": {
+              "leather": {
+                "id": 17592365093649,
+                "quantity": 1,
+                "equipped?": true,
+                "class-starting-equipment?": true
+              }
+            },
+            "magic-armor": null,
+            "magic-items": null,
+            "weapons": [
+              [
+                "dagger",
+                {
+                  "id": 17592365093596,
+                  "quantity": 1,
+                  "equipped?": true,
+                  "class-starting-equipment?": true
+                }
+              ],
+              [
+                "rapier",
+                {
+                  "quantity": 1,
+                  "equipped?": true
+                }
+              ]
+            ],
+            "magic-weapons": [
+              [
+                "rapier-1",
+                {
+                  "id": 17592365093654,
+                  "quantity": 1,
+                  "equipped?": false
+                }
+              ]
+            ]
+          }
+        ],
+        "spells": [
+          {
+            "spellcasting_fields": "TO-DO Spells. um yah... it's a nightmare to pull spells and details"
+          }
+        ],
+        "damage_resistances": [
+          {
+            "value": "fire",
+            "qualifier": null
+          }
+        ],
+        "treasure": {
+          "treasure": "Rapier +1 (1)"
+        },
+        "abilities_bonuses": [
+          {
+            "abilities": {
+              "str": 8,
+              "dex": 12,
+              "con": 14,
+              "int": 14,
+              "wis": 10,
+              "cha": 17
+            },
+            "bonuses": {
+              "str": -1,
+              "dex": 1,
+              "con": 2,
+              "int": 2,
+              "wis": 0,
+              "cha": 3
+            }
+          }
+        ],
+        "image_url": null,
+        "damage_vulnerabilities": null,
+        "proficiencies": [
+          {
+            "all": "Tool Proficiencies: Flute; Lute; Viol\n\nWeapon Proficiencies: Crossbow, hand; Longsword; Rapier; Shortsword; Simple\n\nArmor Proficiencies: Light\n\nLanguage Proficiencies: Common; Infernal",
+            "tool": "Flute; Lute; Viol",
+            "weapon": "Crossbow, hand; Longsword; Rapier; Shortsword; Simple",
+            "armor": "Light",
+            "language": "Common; Infernal"
+          }
+        ],
+        "skills": {
+          "religion": "+2",
+          "animal-handling-check": false,
+          "persuasion": "+5",
+          "sleight-of-hand-check": false,
+          "religion-check": false,
+          "nature-check": false,
+          "investigation": "+2",
+          "performance-check": false,
+          "acrobatics": "+1",
+          "performance": "+3",
+          "perception": "+2",
+          "sleight-of-hand": "+1",
+          "medicine-check": false,
+          "investigation-check": false,
+          "survival": "0",
+          "history": "+2",
+          "history-check": false,
+          "animal-handling": "0",
+          "nature": "+2",
+          "deception": "+3",
+          "intimidation": "+3",
+          "arcana": "+4",
+          "athletics": "-1",
+          "perception-check": true,
+          "intimidation-check": false,
+          "survival-check": false,
+          "insight-check": false,
+          "stealth-check": false,
+          "deception-check": false,
+          "athletics-check": false,
+          "persuasion-check": true,
+          "arcana-check": true,
+          "acrobatics-check": false,
+          "insight": "0",
+          "medicine": "0",
+          "stealth": "+1"
+        },
+        "characteristics": [
+          {
+            "factions_and_organizations": "The Whispering Verse",
+            "faction_image_url": null,
+            "eyes": "violet",
+            "age": "25",
+            "sex": "Female",
+            "ideals": "Свобода. Знания не должны принадлежать только сильным мира сего или тем, кто прячет их в тайне.",
+            "speed": 30,
+            "personality-trait-2": "Харизматичная и острая на язык, она скрывает уязвимость за юмором и уверенностью.",
+            "bonds": "Моя музыка и мои истории — способ сохранить истины, которые мир пытается забыть.",
+            "personality_trait_1": "Любопытная и бесстрашная, её всегда тянет к тайнам и запретным знаниям.",
+            "weight": "65 kg",
+            "hair": "dark red",
+            "skin": "Fair with warm undertones",
+            "height": "180 cm",
+            "character_backstory": "Лориэль — рыжеволосая бардесса с пронзительными фиолетовыми глазами и серебряным кольцом в носу.\nОна открыта к приключениям и искренне стремится помогать тем, кто рядом. С детства Лориэль умела слушать, поддерживать словом и находить выход из сложных ситуаций — навыки, которые со временем превратились в её главное оружие.\nПутешествуя из города в город, она собирает песни, истории и тайны, не ради славы, а чтобы лучше понимать мир и людей в нём. Помогая друзьям и спутникам, Лориэль чувствует, что может полностью раскрыть свой потенциал — именно в таких моментах её магия, музыка и ум работают в гармонии.\nЕё обаяние и лёгкость скрывают острый разум и глубокую эмпатию. Лориэль верит, что добрые поступки и искренние намерения способны менять судьбы — и она готова идти вперёд, куда бы ни привело следующее приключение.",
+            "flaws": "Я слишком легко иду на риск и часто доверяю инстинктам больше, чем осторожности."
+          }
+        ],
+        "save_bonuses": {
+          "str": -1,
+          "dex": 3,
+          "con": 2,
+          "int": 2,
+          "wis": 0,
+          "cha": 5
+        },
+        "character_name": "Loriel",
+        "attacks": {
+          "attacks-and-spellcasting": "Number of Attacks: 1\n",
+          "weapon-name-1": "Dagger",
+          "weapon-attack-bonus-1": "+3",
+          "weapon-damage-1": "1d4+1 piercing",
+          "weapon-name-2": "Rapier",
+          "weapon-attack-bonus-2": "+3",
+          "weapon-damage-2": "1d8+1 piercing"
+        },
+        "hp": [
+          {
+            "hp_current": null,
+            "hp_max": 10
+          }
+        ],
+        "initiative_bonus": 1,
+        "classes": {
+          "bard": {
+            "class-name": "Bard",
+            "class-level": 1,
+            "hit-die": 8
+          }
+        },
+        "condition_immunities": [],
+        "traits": {
+          "features-and-traits-2": "Darkvision: 60 ft.\nDamage Resistances: fire\n\n----------Bonus Actions----------\nBardic Inspiration. Inspire another creature with a 1d6 that it can, within the next 10 min., add to a d20 roll (use 3 times/long rest).\n\n-----------Other Traits------------\nHellish Resistance. Resistance to fire damage.\n\nInfernal Legacy. You know thaumaturgy and can cast  once per day. CHA is the spellcasting ability."
+        }
+      }
+    ]
+  }

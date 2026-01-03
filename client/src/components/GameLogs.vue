@@ -32,6 +32,8 @@ const logTypes = [
   { key: 'map_change', label: 'Смена карты' },
   { key: 'token_add', label: 'Добавление токенов' },
   { key: 'token_remove', label: 'Удаление токенов' },
+  { key: 'token_hide', label: 'Скрытие токенов' },
+  { key: 'token_show', label: 'Показ токенов' },
 ];
 
 // Форматирование сообщения лога
@@ -54,6 +56,10 @@ function formatLogMessage(log) {
       return `${log.data.tokenName || 'Токен'} добавлен на позицию (${log.data.position.x}, ${log.data.position.y})`;
     case 'token_remove':
       return `${log.data.tokenName || 'Токен'} убран с позиции (${log.data.position.x}, ${log.data.position.y})`;
+    case 'token_hide':
+      return `${log.data.tokenName || 'Токен'} ушел с поля зрения`;
+    case 'token_show':
+      return `${log.data.tokenName || 'Токен'} вернулся на поле зрения`;
     default:
       return 'Неизвестное действие';
   }
