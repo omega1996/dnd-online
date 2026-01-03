@@ -7,13 +7,13 @@ import { getAnalytics } from "firebase/analytics";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyBigm60Zwfkys2MI85oKjPCP8joIgNpa4g",
-  authDomain: "dnd-online-3e483.firebaseapp.com",
-  projectId: "dnd-online-3e483",
-  storageBucket: "dnd-online-3e483.firebasestorage.app",
-  messagingSenderId: "119081191002",
-  appId: "1:119081191002:web:e4420c0eb394f74842fa63",
-  measurementId: "G-13PTZH7WZ0"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
