@@ -57,8 +57,10 @@ async function handleJsonFileSelect(event) {
       const parsed = JSON.parse(text);
       
       // Проверяем структуру
-      if (!parsed.player_name || !parsed.character || !Array.isArray(parsed.character) || parsed.character.length === 0) {
-        error.value = "Invalid DND character JSON structure";
+      // player_name может быть null или пустой строкой - это валидно
+      // Главное - проверить наличие массива character с данными
+      if (!parsed.character || !Array.isArray(parsed.character) || parsed.character.length === 0) {
+        error.value = "Invalid DND character JSON structure: missing or empty character array";
         event.target.value = "";
         return;
       }
@@ -67,8 +69,14 @@ async function handleJsonFileSelect(event) {
       characterData.value = parsed;
       useJsonData.value = true;
       
-      // Автоматически заполняем имя из player_name
-      name.value = parsed.player_name;
+      // Автоматически заполняем имя из player_name или character_name
+      // Если player_name отсутствует или null, используем character_name из первого персонажа
+      if (parsed.player_name && parsed.player_name.trim()) {
+        name.value = parsed.player_name;
+      } else if (parsed.character[0]?.character_name) {
+        name.value = parsed.character[0].character_name;
+      }
+      // Если оба отсутствуют, оставляем поле пустым для ручного ввода
       
       error.value = null;
     } catch (err) {

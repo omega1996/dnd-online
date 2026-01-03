@@ -12,8 +12,8 @@ service cloud.firestore {
         let hasUserId = request.resource.data.userId == request.auth.uid;
         let hasImageUrl = request.resource.data.imageUrl is string;
         
-        // Проверяем новую структуру DND (player_name + characterData)
-        let hasNewStructure = request.resource.data.player_name is string
+        // Проверяем новую структуру DND (player_name может быть null или строкой + characterData)
+        let hasNewStructure = (request.resource.data.player_name == null || request.resource.data.player_name is string)
           && request.resource.data.characterData is map;
         
         // Проверяем старую структуру (name + stats) для обратной совместимости
