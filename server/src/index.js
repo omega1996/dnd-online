@@ -99,8 +99,8 @@ const rooms = new Map();
 function createRoomState() {
   return {
     version: 1,
-    map: { src: null, grid: { size: 50, enabled: true } },
-    tokens: {}, // tokenId -> { id, x, y, src, name, ownerId }
+    map: { src: null, grid: { rows: 10, columns: 10, enabled: true } },
+    tokens: {}, // tokenId -> { id, gridX, gridY, src, name, ownerId }
     meta: { createdAt: Date.now() },
   };
 }
@@ -185,12 +185,20 @@ function applyAction(room, action, socket) {
       }
       room.state.map.src = payload.src;
       if (payload.grid) {
-        if (typeof payload.grid.size === "number") {
-          room.state.map.grid.size = payload.grid.size;
+        if (typeof payload.grid.rows === "number") {
+          room.state.map.grid.rows = payload.grid.rows;
+        }
+        if (typeof payload.grid.columns === "number") {
+          room.state.map.grid.columns = payload.grid.columns;
         }
         if (typeof payload.grid.enabled === "boolean") {
           room.state.map.grid.enabled = payload.grid.enabled;
         }
+      }
+      // При загрузке новой карты сбрасываем все токены на позицию 0,0
+      for (const tokenId in room.state.tokens) {
+        room.state.tokens[tokenId].gridX = 0;
+        room.state.tokens[tokenId].gridY = 0;
       }
       break;
     }
@@ -204,8 +212,8 @@ function applyAction(room, action, socket) {
       }
       room.state.tokens[payload.id] = {
         id: payload.id,
-        x: payload.x ?? 0,
-        y: payload.y ?? 0,
+        gridX: payload.gridX ?? 0,
+        gridY: payload.gridY ?? 0,
         src: payload.src ?? null,
         name: payload.name ?? "Token",
         ownerId: payload.ownerId ?? socket.id,
@@ -221,11 +229,11 @@ function applyAction(room, action, socket) {
       if (!token) {
         return { ok: false, error: "TOKEN_NOT_FOUND" };
       }
-      if (typeof payload.x === "number") {
-        token.x = payload.x;
+      if (typeof payload.gridX === "number") {
+        token.gridX = payload.gridX;
       }
-      if (typeof payload.y === "number") {
-        token.y = payload.y;
+      if (typeof payload.gridY === "number") {
+        token.gridY = payload.gridY;
       }
       break;
     }
@@ -247,11 +255,11 @@ function applyAction(room, action, socket) {
       if (payload.ownerId !== undefined) {
         token.ownerId = payload.ownerId;
       }
-      if (typeof payload.x === "number") {
-        token.x = payload.x;
+      if (typeof payload.gridX === "number") {
+        token.gridX = payload.gridX;
       }
-      if (typeof payload.y === "number") {
-        token.y = payload.y;
+      if (typeof payload.gridY === "number") {
+        token.gridY = payload.gridY;
       }
       break;
     }

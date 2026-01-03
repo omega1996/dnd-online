@@ -33,9 +33,9 @@
   }
 
   // Обработчик перемещения токена
-  function handleTokenMove(tokenId, x, y) {
-    console.log('[App] Token move:', tokenId, 'to', x, y);
-    sendAction('TOKEN_MOVE', { id: tokenId, x, y });
+  function handleTokenMove(tokenId, gridX, gridY) {
+    console.log('[App] Token move:', tokenId, 'to grid', gridX, gridY);
+    sendAction('TOKEN_MOVE', { id: tokenId, gridX, gridY });
   }
 
   // Обработчик действий от GameScreen

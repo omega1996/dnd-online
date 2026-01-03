@@ -42,6 +42,8 @@ const isUploading = ref(false);
 const showSetMapForm = ref(false);
 const newMapFile = ref(null);
 const isUploadingMap = ref(false);
+const gridRows = ref(10);
+const gridColumns = ref(10);
 
 // Computed для карты и токенов
 const mapSrc = computed(() => props.roomState?.map?.src || null);
@@ -167,14 +169,14 @@ async function handleAddToken() {
     const fullImageUrl = `${props.serverUrl}${imageUrl}`;
 
     const tokenId = generateTokenId();
-    // Позиция по центру экрана (можно изменить на случайную или клик мыши)
-    const x = 400;
-    const y = 300;
+    // Позиция на сетке (0, 0) - начальная позиция
+    const gridX = 0;
+    const gridY = 0;
 
     const payload = {
       id: tokenId,
-      x,
-      y,
+      gridX,
+      gridY,
       src: fullImageUrl,
       name: `Token ${tokenId.slice(-6)}`,
       ownerId: newTokenOwnerId.value || undefined, // Если не выбран, будет установлен socket.id мастера
@@ -252,8 +254,15 @@ async function handleSetMap() {
     // Полный URL для доступа к файлу
     const fullImageUrl = `${props.serverUrl}${imageUrl}`;
 
-    // Отправляем действие установки карты
-    sendAction("MAP_SET", { src: fullImageUrl });
+    // Отправляем действие установки карты с параметрами сетки
+    sendAction("MAP_SET", { 
+      src: fullImageUrl,
+      grid: {
+        rows: parseInt(gridRows.value) || 10,
+        columns: parseInt(gridColumns.value) || 10,
+        enabled: true
+      }
+    });
 
     // Очищаем форму
     newMapFile.value = null;
@@ -267,8 +276,8 @@ async function handleSetMap() {
 }
 
 // Обработчик перемещения токена
-function handleTokenMove(tokenId, x, y) {
-  emit("token-move", tokenId, x, y);
+function handleTokenMove(tokenId, gridX, gridY) {
+  emit("token-move", tokenId, gridX, gridY);
 }
 
 function handleLeave() {
@@ -380,6 +389,7 @@ onUnmounted(() => {
         <BoardCanvas
           :map-src="mapSrc"
           :tokens="tokens"
+          :map-grid="roomState?.map?.grid"
           :on-token-move="handleTokenMove"
         />
       </div>
@@ -564,6 +574,42 @@ onUnmounted(() => {
                     }}
                     KB)
                   </small>
+                </label>
+                <label style="display: flex; flex-direction: column; gap: 4px">
+                  <span style="font-size: 13px; font-weight: 500"
+                    >Grid Rows *</span
+                  >
+                  <input
+                    type="number"
+                    v-model.number="gridRows"
+                    :disabled="isUploadingMap"
+                    min="1"
+                    max="100"
+                    style="
+                      padding: 8px;
+                      border: 1px solid #ccc;
+                      border-radius: 4px;
+                      font-size: 13px;
+                    "
+                  />
+                </label>
+                <label style="display: flex; flex-direction: column; gap: 4px">
+                  <span style="font-size: 13px; font-weight: 500"
+                    >Grid Columns *</span
+                  >
+                  <input
+                    type="number"
+                    v-model.number="gridColumns"
+                    :disabled="isUploadingMap"
+                    min="1"
+                    max="100"
+                    style="
+                      padding: 8px;
+                      border: 1px solid #ccc;
+                      border-radius: 4px;
+                      font-size: 13px;
+                    "
+                  />
                 </label>
                 <button
                   @click="handleSetMap"

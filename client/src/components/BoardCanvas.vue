@@ -12,6 +12,10 @@ const props = defineProps({
     type: Object,
     default: () => ({})
   },
+  mapGrid: {
+    type: Object,
+    default: () => ({ rows: 10, columns: 10, enabled: true })
+  },
   onTokenMove: {
     type: Function,
     required: true
@@ -24,8 +28,42 @@ const worldContainer = ref(null);
 const mapSprite = ref(null);
 const tokenSprites = ref(new Map());
 const resizeObserver = ref(null);
+const gridGraphics = ref(null);
+const isUpdatingTokens = ref(false);
 
 const boardState = useBoardState();
+
+// Преобразование координат сетки в пиксели
+function gridToPixel(gridX, gridY) {
+  if (!app.value || !props.mapGrid) {
+    return { x: 0, y: 0 };
+  }
+  const canvasWidth = app.value.screen.width;
+  const canvasHeight = app.value.screen.height;
+  const cellWidth = canvasWidth / props.mapGrid.columns;
+  const cellHeight = canvasHeight / props.mapGrid.rows;
+  return {
+    x: gridX * cellWidth + cellWidth / 2,
+    y: gridY * cellHeight + cellHeight / 2
+  };
+}
+
+// Преобразование пикселей в координаты сетки (с snap to grid)
+function pixelToGrid(pixelX, pixelY) {
+  if (!app.value || !props.mapGrid) {
+    return { gridX: 0, gridY: 0 };
+  }
+  const canvasWidth = app.value.screen.width;
+  const canvasHeight = app.value.screen.height;
+  const cellWidth = canvasWidth / props.mapGrid.columns;
+  const cellHeight = canvasHeight / props.mapGrid.rows;
+  
+  // Ограничиваем координаты в пределах сетки
+  const gridX = Math.max(0, Math.min(props.mapGrid.columns - 1, Math.floor(pixelX / cellWidth)));
+  const gridY = Math.max(0, Math.min(props.mapGrid.rows - 1, Math.floor(pixelY / cellHeight)));
+  
+  return { gridX, gridY };
+}
 
 // Инициализация PixiJS
 async function initPixi() {
@@ -93,6 +131,9 @@ async function initPixi() {
       await loadMap(props.mapSrc);
     }
 
+    // Создаем сетку
+    drawGrid();
+
     // Создаем токены
     updateTokens();
 
@@ -144,6 +185,9 @@ async function loadMap(src) {
     mapSprite.value.y = 0;
     
     worldContainer.value.addChildAt(mapSprite.value, 0);
+    
+    // Перерисовываем сетку после загрузки карты
+    drawGrid();
   } catch (error) {
     console.error('[BoardCanvas] Failed to load map:', error);
   }
@@ -227,6 +271,14 @@ function createDefaultTokenSprite() {
 // Обновление токенов
 async function updateTokens() {
   if (!worldContainer.value) return;
+  
+  // Защита от одновременных вызовов
+  if (isUpdatingTokens.value) {
+    console.log('[BoardCanvas] updateTokens already in progress, skipping');
+    return;
+  }
+  
+  isUpdatingTokens.value = true;
 
   console.log('[BoardCanvas] updateTokens called, tokens:', props.tokens);
 
@@ -238,7 +290,10 @@ async function updateTokens() {
     if (!currentTokenIds.has(tokenId)) {
       const sprite = tokenSprites.value.get(tokenId);
       if (sprite) {
-        worldContainer.value.removeChild(sprite);
+        // Проверяем, что спрайт действительно в контейнере перед удалением
+        if (sprite.parent === worldContainer.value) {
+          worldContainer.value.removeChild(sprite);
+        }
         sprite.destroy();
       }
       tokenSprites.value.delete(tokenId);
@@ -255,48 +310,71 @@ async function updateTokens() {
       // Загружаем изображение токена
       sprite = await loadTokenImage(tokenId, token);
       
-      sprite.x = token.x || 0;
-      sprite.y = token.y || 0;
+      // Преобразуем координаты сетки в пиксели
+      const pixelPos = gridToPixel(token.gridX || 0, token.gridY || 0);
+      sprite.x = pixelPos.x;
+      sprite.y = pixelPos.y;
       sprite.tokenId = tokenId;
       sprite.eventMode = 'static';
       sprite.cursor = 'pointer';
       
       tokenSprites.value.set(tokenId, sprite);
-      worldContainer.value.addChild(sprite);
       
-      console.log(`[BoardCanvas] Sprite added to container for token ${tokenId}`);
+      // Проверяем, что спрайт еще не добавлен в контейнер
+      if (sprite.parent !== worldContainer.value) {
+        worldContainer.value.addChild(sprite);
+        console.log(`[BoardCanvas] Sprite added to container for token ${tokenId}`);
+      } else {
+        console.warn(`[BoardCanvas] Sprite for token ${tokenId} already in container!`);
+      }
       
       // Настраиваем drag для нового токена
       setupTokenDrag(sprite);
     } else {
+      // Проверяем, что спрайт добавлен в контейнер
+      if (sprite.parent !== worldContainer.value) {
+        console.warn(`[BoardCanvas] Sprite for token ${tokenId} exists but not in container, adding it`);
+        worldContainer.value.addChild(sprite);
+      }
+      
       // Обновляем позицию только если токен не перетаскивается
       if (boardState.draggedToken.value !== tokenId) {
-        sprite.x = token.x || 0;
-        sprite.y = token.y || 0;
+        const pixelPos = gridToPixel(token.gridX || 0, token.gridY || 0);
+        sprite.x = pixelPos.x;
+        sprite.y = pixelPos.y;
       }
       
       // Если изменился src, перезагружаем изображение
       const currentSrc = sprite.texture?.baseTexture?.resource?.url || sprite.texture?.baseTexture?.resource?.src;
       if (token.src && currentSrc !== token.src) {
-        // Удаляем старый спрайт
-        worldContainer.value.removeChild(sprite);
+        // Удаляем старый спрайт из контейнера, если он там есть
+        if (sprite.parent === worldContainer.value) {
+          worldContainer.value.removeChild(sprite);
+        }
         sprite.destroy();
         tokenSprites.value.delete(tokenId);
         
         // Создаем новый с новым изображением
         const newSprite = await loadTokenImage(tokenId, token);
-        newSprite.x = token.x || 0;
-        newSprite.y = token.y || 0;
+        const pixelPos = gridToPixel(token.gridX || 0, token.gridY || 0);
+        newSprite.x = pixelPos.x;
+        newSprite.y = pixelPos.y;
         newSprite.tokenId = tokenId;
         newSprite.eventMode = 'static';
         newSprite.cursor = 'pointer';
         
         tokenSprites.value.set(tokenId, newSprite);
-        worldContainer.value.addChild(newSprite);
+        
+        // Проверяем, что новый спрайт еще не добавлен
+        if (newSprite.parent !== worldContainer.value) {
+          worldContainer.value.addChild(newSprite);
+        }
         setupTokenDrag(newSprite);
       }
     }
   }
+  
+  isUpdatingTokens.value = false;
 }
 
 // Настройка drag для токена
@@ -313,7 +391,8 @@ function setupTokenDrag(sprite) {
     const worldPos = globalToWorld(e.global.x, e.global.y);
     const token = props.tokens[sprite.tokenId];
     if (token) {
-      boardState.startDragToken(sprite.tokenId, worldPos.x, worldPos.y, token.x, token.y);
+      const pixelPos = gridToPixel(token.gridX || 0, token.gridY || 0);
+      boardState.startDragToken(sprite.tokenId, worldPos.x, worldPos.y, pixelPos.x, pixelPos.y);
       sprite.alpha = 0.7;
     }
   });
@@ -323,7 +402,9 @@ function setupTokenDrag(sprite) {
       sprite.alpha = 1;
       const finalPos = boardState.endDragToken();
       if (finalPos) {
-        props.onTokenMove(finalPos.tokenId, finalPos.x, finalPos.y);
+        // Преобразуем пиксели в координаты сетки
+        const gridPos = pixelToGrid(finalPos.x, finalPos.y);
+        props.onTokenMove(finalPos.tokenId, gridPos.gridX, gridPos.gridY);
       }
     }
   });
@@ -333,7 +414,9 @@ function setupTokenDrag(sprite) {
       sprite.alpha = 1;
       const finalPos = boardState.endDragToken();
       if (finalPos) {
-        props.onTokenMove(finalPos.tokenId, finalPos.x, finalPos.y);
+        // Преобразуем пиксели в координаты сетки
+        const gridPos = pixelToGrid(finalPos.x, finalPos.y);
+        props.onTokenMove(finalPos.tokenId, gridPos.gridX, gridPos.gridY);
       }
     }
   });
@@ -364,11 +447,58 @@ function setupInteraction() {
       const sprite = tokenSprites.value.get(boardState.draggedToken.value);
       if (sprite) {
         const pos = boardState.getDragPosition();
+        // При drag показываем позицию в пикселях, но при отпускании snap к сетке
         sprite.x = pos.x;
         sprite.y = pos.y;
       }
     }
   });
+}
+
+// Отрисовка сетки
+function drawGrid() {
+  if (!worldContainer.value || !app.value || !props.mapGrid || !props.mapGrid.enabled) {
+    return;
+  }
+
+  // Удаляем старую сетку
+  if (gridGraphics.value) {
+    worldContainer.value.removeChild(gridGraphics.value);
+    gridGraphics.value.destroy();
+    gridGraphics.value = null;
+  }
+
+  const canvasWidth = app.value.screen.width;
+  const canvasHeight = app.value.screen.height;
+  const rows = props.mapGrid.rows || 10;
+  const columns = props.mapGrid.columns || 10;
+  const cellWidth = canvasWidth / columns;
+  const cellHeight = canvasHeight / rows;
+
+  gridGraphics.value = new PIXI.Graphics();
+  gridGraphics.value.lineStyle({ width: 1, color: 0xffffff, alpha: 0.3 });
+
+  // Вертикальные линии
+  for (let i = 0; i <= columns; i++) {
+    const x = i * cellWidth;
+    gridGraphics.value.moveTo(x, 0);
+    gridGraphics.value.lineTo(x, canvasHeight);
+  }
+
+  // Горизонтальные линии
+  for (let i = 0; i <= rows; i++) {
+    const y = i * cellHeight;
+    gridGraphics.value.moveTo(0, y);
+    gridGraphics.value.lineTo(canvasWidth, y);
+  }
+
+  // Добавляем сетку после карты, но перед токенами
+  if (mapSprite.value) {
+    const mapIndex = worldContainer.value.getChildIndex(mapSprite.value);
+    worldContainer.value.addChildAt(gridGraphics.value, mapIndex + 1);
+  } else {
+    worldContainer.value.addChildAt(gridGraphics.value, 0);
+  }
 }
 
 // Обновление размера карты при изменении размера canvas
@@ -379,6 +509,9 @@ function updateMapSize() {
   const canvasHeight = app.value.screen.height;
   mapSprite.value.width = canvasWidth;
   mapSprite.value.height = canvasHeight;
+  
+  // Перерисовываем сетку при изменении размера
+  drawGrid();
 }
 
 // Обработчик изменения размера контейнера
@@ -392,6 +525,8 @@ function handleResize() {
     console.log('[BoardCanvas] Resizing from', app.value.screen.width, 'x', app.value.screen.height, 'to:', newWidth, 'x', newHeight);
     app.value.renderer.resize(newWidth, newHeight);
     updateMapSize();
+    // Обновляем позиции токенов при изменении размера
+    updateTokens();
   }
 }
 
@@ -399,8 +534,17 @@ function handleResize() {
 watch(() => props.mapSrc, (newSrc) => {
   if (newSrc && worldContainer.value) {
     loadMap(newSrc);
+    drawGrid();
   }
 });
+
+watch(() => props.mapGrid, () => {
+  if (worldContainer.value) {
+    drawGrid();
+    // Обновляем позиции токенов при изменении сетки
+    updateTokens();
+  }
+}, { deep: true });
 
 watch(() => props.tokens, () => {
   updateTokens();
