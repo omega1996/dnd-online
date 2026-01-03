@@ -6,6 +6,7 @@ import { useCharacters } from "../composables/useCharacters";
 import CharacterViewModal from "./CharacterViewModal.vue";
 import CreateCharacterModal from "./CreateCharacterModal.vue";
 import CharacterCard from "./CharacterCard.vue";
+import GameLogs from "./GameLogs.vue";
 
 const props = defineProps({
   serverUrl: {
@@ -67,6 +68,7 @@ const gridColumns = ref(10);
 const mapSrc = computed(() => props.roomState?.map?.src || null);
 const tokens = computed(() => props.roomState?.tokens || {});
 const isGM = computed(() => props.myRole === "GM");
+const gameLogs = computed(() => props.roomState?.logs || []);
 
 // Размеры для игрового поля в соотношении 16:9
 const gameAreaHeight = ref(0);
@@ -503,7 +505,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- Основной контент: карта слева, панель справа -->
+    <!-- Основной контент: карта и логи слева, панель справа -->
     <div
       style="
         display: flex;
@@ -514,26 +516,48 @@ onUnmounted(() => {
         align-items: flex-start;
       "
     >
-      <!-- Карта (слева) -->
+      <!-- Левая колонка: карта и логи -->
       <div
-        :style="{
-          width: `${gameAreaWidth}px`,
-          height: `${gameAreaHeight}px`,
-          minWidth: 0,
-          minHeight: 0,
-          borderRight: '1px solid #ddd',
-          position: 'relative',
-          display: 'flex',
-          flexShrink: 0,
-        }"
+        style="
+          display: flex;
+          flex-direction: column;
+          border-right: 1px solid #ddd;
+          flex-shrink: 0;
+        "
       >
-        <BoardCanvas
-          :map-src="mapSrc"
-          :tokens="tokens"
-          :map-grid="roomState?.map?.grid"
-          :on-token-move="handleTokenMove"
-          :on-token-click="handleTokenClick"
-        />
+        <!-- Карта -->
+        <div
+          :style="{
+            width: `${gameAreaWidth}px`,
+            height: `${gameAreaHeight}px`,
+            minWidth: 0,
+            minHeight: 0,
+            position: 'relative',
+            display: 'flex',
+            flexShrink: 0,
+          }"
+        >
+          <BoardCanvas
+            :map-src="mapSrc"
+            :tokens="tokens"
+            :map-grid="roomState?.map?.grid"
+            :on-token-move="handleTokenMove"
+            :on-token-click="handleTokenClick"
+          />
+        </div>
+        
+        <!-- Логи под картой -->
+        <div
+          :style="{
+            width: `${gameAreaWidth}px`,
+            height: '600px',
+            minHeight: '600px',
+            maxHeight: '900px',
+            flexShrink: 0,
+          }"
+        >
+          <GameLogs :logs="gameLogs" />
+        </div>
       </div>
 
       <!-- Панель управления (справа) -->

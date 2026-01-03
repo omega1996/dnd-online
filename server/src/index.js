@@ -101,6 +101,7 @@ function createRoomState() {
     version: 1,
     map: { src: null, grid: { rows: 10, columns: 10, enabled: true } },
     tokens: {}, // tokenId -> { id, gridX, gridY, src, name, ownerId }
+    logs: [], // Массив логов: [{ id, type, timestamp, data, userId, userName }]
     meta: { createdAt: Date.now() },
   };
 }
@@ -160,6 +161,30 @@ function hasPermission(room, action, socketId) {
 }
 
 /**
+ * Создает лог действия
+ * @param {Object} room - объект комнаты
+ * @param {string} type - тип лога (move, dice, map_change)
+ * @param {Object} data - данные лога
+ * @param {string} userId - ID пользователя
+ * @param {string} userName - имя пользователя
+ */
+function addLog(room, type, data, userId, userName) {
+  const log = {
+    id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    type,
+    timestamp: Date.now(),
+    data,
+    userId,
+    userName,
+  };
+  room.state.logs.unshift(log); // Добавляем в начало массива (новые сверху)
+  // Ограничиваем количество логов (например, последние 100)
+  if (room.state.logs.length > 100) {
+    room.state.logs = room.state.logs.slice(0, 100);
+  }
+}
+
+/**
  * Применяет действие к состоянию комнаты
  * @param {Object} room - объект комнаты
  * @param {Object} action - действие { type, payload }
@@ -177,12 +202,15 @@ function applyAction(room, action, socket) {
   }
 
   const { type, payload } = action;
+  const member = room.members.get(socket.id);
+  const userName = member?.name || "Unknown";
 
   switch (type) {
     case "MAP_SET": {
       if (!payload || typeof payload.src !== "string") {
         return { ok: false, error: "INVALID_PAYLOAD" };
       }
+      const oldMapSrc = room.state.map.src;
       room.state.map.src = payload.src;
       if (payload.grid) {
         if (typeof payload.grid.rows === "number") {
@@ -200,6 +228,13 @@ function applyAction(room, action, socket) {
         room.state.tokens[tokenId].gridX = 0;
         room.state.tokens[tokenId].gridY = 0;
       }
+      // Добавляем лог смены карты
+      if (oldMapSrc !== payload.src) {
+        addLog(room, "map_change", {
+          mapSrc: payload.src,
+          grid: room.state.map.grid,
+        }, socket.id, userName);
+      }
       break;
     }
 
@@ -210,7 +245,7 @@ function applyAction(room, action, socket) {
       if (room.state.tokens[payload.id]) {
         return { ok: false, error: "TOKEN_EXISTS" };
       }
-      room.state.tokens[payload.id] = {
+      const token = {
         id: payload.id,
         gridX: payload.gridX ?? 0,
         gridY: payload.gridY ?? 0,
@@ -219,6 +254,13 @@ function applyAction(room, action, socket) {
         ownerId: payload.ownerId ?? socket.id,
         characterId: payload.characterId ?? null, // ID персонажа, если токен связан с персонажем
       };
+      room.state.tokens[payload.id] = token;
+      // Добавляем лог добавления токена
+      addLog(room, "token_add", {
+        tokenId: token.id,
+        tokenName: token.name,
+        position: { x: token.gridX, y: token.gridY },
+      }, socket.id, userName);
       break;
     }
 
@@ -230,11 +272,22 @@ function applyAction(room, action, socket) {
       if (!token) {
         return { ok: false, error: "TOKEN_NOT_FOUND" };
       }
+      const oldX = token.gridX;
+      const oldY = token.gridY;
       if (typeof payload.gridX === "number") {
         token.gridX = payload.gridX;
       }
       if (typeof payload.gridY === "number") {
         token.gridY = payload.gridY;
+      }
+      // Добавляем лог перемещения только если позиция изменилась
+      if (token.gridX !== oldX || token.gridY !== oldY) {
+        addLog(room, "move", {
+          tokenId: token.id,
+          tokenName: token.name,
+          from: { x: oldX, y: oldY },
+          to: { x: token.gridX, y: token.gridY },
+        }, socket.id, userName);
       }
       break;
     }
@@ -272,10 +325,19 @@ function applyAction(room, action, socket) {
       if (!payload || !payload.id || typeof payload.id !== "string") {
         return { ok: false, error: "INVALID_PAYLOAD" };
       }
-      if (!room.state.tokens[payload.id]) {
+      const token = room.state.tokens[payload.id];
+      if (!token) {
         return { ok: false, error: "TOKEN_NOT_FOUND" };
       }
+      // Сохраняем информацию о токене перед удалением для лога
+      const tokenInfo = {
+        tokenId: token.id,
+        tokenName: token.name,
+        position: { x: token.gridX, y: token.gridY },
+      };
       delete room.state.tokens[payload.id];
+      // Добавляем лог удаления токена
+      addLog(room, "token_remove", tokenInfo, socket.id, userName);
       break;
     }
 
