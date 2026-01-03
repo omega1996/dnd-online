@@ -10,6 +10,15 @@
   const members = ref([]);
   const me = ref(null);
   const roomState = ref(null);
+
+  function sendAction(type, payload) {
+    if (!socket.connected) return;
+    socket.emit("room:action", { action: { type, payload } }, (res) => {
+      if (!res?.ok) {
+        console.error("Action failed:", res?.error);
+      }
+    });
+  }
   
   async function createRoom() {
     const r = await fetch(`${serverUrl}/rooms`, { method: "POST" });
@@ -81,6 +90,42 @@
         <h3>Room State</h3>
         <pre style="background: #f5f5f5; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 12px;">{{ JSON.stringify(roomState, null, 2) }}</pre>
         <small>Состояние комнаты синхронизируется между всеми участниками.</small>
+
+        <div style="margin-top: 16px;">
+          <h4>Test Actions</h4>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button @click="sendAction('MAP_SET', { src: 'https://example.com/map.jpg' })">
+              Set Map
+            </button>
+            <button @click="sendAction('TOKEN_ADD', { id: 'token-' + Date.now(), x: 100, y: 100, name: 'Test Token' })">
+              Add Token
+            </button>
+            <button 
+              v-if="roomState && Object.keys(roomState.tokens).length > 0"
+              @click="() => {
+                const tokenId = Object.keys(roomState.tokens)[0];
+                sendAction('TOKEN_MOVE', { id: tokenId, x: Math.floor(Math.random() * 500), y: Math.floor(Math.random() * 500) });
+              }">
+              Move First Token
+            </button>
+            <button 
+              v-if="roomState && Object.keys(roomState.tokens).length > 0"
+              @click="() => {
+                const tokenId = Object.keys(roomState.tokens)[0];
+                sendAction('TOKEN_UPDATE', { id: tokenId, name: 'Updated ' + Date.now() });
+              }">
+              Update First Token
+            </button>
+            <button 
+              v-if="roomState && Object.keys(roomState.tokens).length > 0"
+              @click="() => {
+                const tokenId = Object.keys(roomState.tokens)[0];
+                sendAction('TOKEN_REMOVE', { id: tokenId });
+              }">
+              Remove First Token
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </template>

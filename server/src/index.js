@@ -32,6 +32,119 @@ function makeRoomCode() {
   return code;
 }
 
+/**
+ * Применяет действие к состоянию комнаты
+ * @param {Object} room - объект комнаты
+ * @param {Object} action - действие { type, payload }
+ * @param {Object} socket - сокет отправителя (для проверки прав в будущем)
+ * @returns {Object} { ok: boolean, error?: string }
+ */
+function applyAction(room, action, socket) {
+  if (!action || !action.type) {
+    return { ok: false, error: "INVALID_ACTION" };
+  }
+
+  const { type, payload } = action;
+
+  switch (type) {
+    case "MAP_SET": {
+      if (!payload || typeof payload.src !== "string") {
+        return { ok: false, error: "INVALID_PAYLOAD" };
+      }
+      room.state.map.src = payload.src;
+      if (payload.grid) {
+        if (typeof payload.grid.size === "number") {
+          room.state.map.grid.size = payload.grid.size;
+        }
+        if (typeof payload.grid.enabled === "boolean") {
+          room.state.map.grid.enabled = payload.grid.enabled;
+        }
+      }
+      break;
+    }
+
+    case "TOKEN_ADD": {
+      if (!payload || !payload.id || typeof payload.id !== "string") {
+        return { ok: false, error: "INVALID_PAYLOAD" };
+      }
+      if (room.state.tokens[payload.id]) {
+        return { ok: false, error: "TOKEN_EXISTS" };
+      }
+      room.state.tokens[payload.id] = {
+        id: payload.id,
+        x: payload.x ?? 0,
+        y: payload.y ?? 0,
+        src: payload.src ?? null,
+        name: payload.name ?? "Token",
+        ownerId: payload.ownerId ?? socket.id,
+      };
+      break;
+    }
+
+    case "TOKEN_MOVE": {
+      if (!payload || !payload.id || typeof payload.id !== "string") {
+        return { ok: false, error: "INVALID_PAYLOAD" };
+      }
+      const token = room.state.tokens[payload.id];
+      if (!token) {
+        return { ok: false, error: "TOKEN_NOT_FOUND" };
+      }
+      if (typeof payload.x === "number") {
+        token.x = payload.x;
+      }
+      if (typeof payload.y === "number") {
+        token.y = payload.y;
+      }
+      break;
+    }
+
+    case "TOKEN_UPDATE": {
+      if (!payload || !payload.id || typeof payload.id !== "string") {
+        return { ok: false, error: "INVALID_PAYLOAD" };
+      }
+      const token = room.state.tokens[payload.id];
+      if (!token) {
+        return { ok: false, error: "TOKEN_NOT_FOUND" };
+      }
+      if (payload.name !== undefined) {
+        token.name = payload.name;
+      }
+      if (payload.src !== undefined) {
+        token.src = payload.src;
+      }
+      if (payload.ownerId !== undefined) {
+        token.ownerId = payload.ownerId;
+      }
+      if (typeof payload.x === "number") {
+        token.x = payload.x;
+      }
+      if (typeof payload.y === "number") {
+        token.y = payload.y;
+      }
+      break;
+    }
+
+    case "TOKEN_REMOVE": {
+      if (!payload || !payload.id || typeof payload.id !== "string") {
+        return { ok: false, error: "INVALID_PAYLOAD" };
+      }
+      if (!room.state.tokens[payload.id]) {
+        return { ok: false, error: "TOKEN_NOT_FOUND" };
+      }
+      delete room.state.tokens[payload.id];
+      break;
+    }
+
+    default:
+      return { ok: false, error: "UNKNOWN_ACTION_TYPE" };
+  }
+
+  // Увеличиваем версию после успешного применения
+  room.state.version += 1;
+
+  return { ok: true };
+}
+
 app.get("/health", (req, res) => res.json({ ok: true }));
 
 app.post("/rooms", (req, res) => {
@@ -72,7 +185,7 @@ io.on("connection", (socket) => {
     io.to(code).emit("room:members", { members });
   });
 
-  socket.on("room:action", ({ action, payload }, ack) => {
+  socket.on("room:action", ({ action }, ack) => {
     const code = socket.data.roomCode;
     if (!code || !rooms.has(code)) {
       ack?.({ ok: false, error: "NOT_IN_ROOM" });
@@ -81,9 +194,12 @@ io.on("connection", (socket) => {
 
     const room = rooms.get(code);
 
-    // Применяем действие к состоянию (пока просто обновляем версию)
-    // В будущем здесь будет логика обработки разных типов действий
-    room.state.version += 1;
+    // Применяем действие к состоянию
+    const result = applyAction(room, action, socket);
+    if (!result.ok) {
+      ack?.(result);
+      return;
+    }
 
     // Отправляем обновленное состояние всем в комнате
     io.to(code).emit("room:state", { state: room.state });
