@@ -1,0 +1,12 @@
+{
+    "name": "dnd-online",
+    "private": true,
+    "workspaces": ["server", "client"],
+    "scripts": {
+      "dev": "concurrently -n SERVER,CLIENT -c auto \"npm -w server run dev\" \"npm -w client run dev\""
+    },
+    "devDependencies": {
+      "concurrently": "^9.0.0"
+    }
+  }
+  
