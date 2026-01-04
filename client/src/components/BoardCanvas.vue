@@ -306,6 +306,10 @@ async function updateTokens() {
     if (!currentTokenIds.has(tokenId)) {
       const sprite = tokenSprites.value.get(tokenId);
       if (sprite) {
+        // Если токен был в процессе drag, завершаем drag
+        if (boardState.draggedToken.value === tokenId) {
+          boardState.endDragToken();
+        }
         // Проверяем, что спрайт действительно в контейнере перед удалением
         if (sprite.parent === worldContainer.value) {
           worldContainer.value.removeChild(sprite);

@@ -42,7 +42,10 @@ const logTypes = [
 function formatLogMessage(log) {
   switch (log.type) {
     case 'move':
-      return `${log.data.tokenName || 'Токен'} переместился с (${log.data.from.x}, ${log.data.from.y}) на (${log.data.to.x}, ${log.data.to.y})`;
+      if (log.data.from && log.data.to) {
+        return `${log.data.tokenName || 'Токен'} переместился с (${log.data.from.x}, ${log.data.from.y}) на (${log.data.to.x}, ${log.data.to.y})`;
+      }
+      return `${log.data.tokenName || 'Токен'} переместился`;
     case 'dice':
       const diceType = log.data.diceType || `D${log.data.sides || '?'}`;
       const result = log.data.result || 'N/A';
@@ -61,9 +64,16 @@ function formatLogMessage(log) {
     case 'map_change':
       return `${log.userName} сменил карту`;
     case 'token_add':
-      return `${log.data.tokenName || 'Токен'} добавлен на позицию (${log.data.position.x}, ${log.data.position.y})`;
+      if (log.data.position) {
+        return `${log.data.tokenName || 'Токен'} добавлен на позицию (${log.data.position.x}, ${log.data.position.y})`;
+      }
+      return `${log.data.tokenName || 'Токен'} добавлен`;
     case 'token_remove':
-      return `${log.data.tokenName || 'Токен'} убран с позиции (${log.data.position.x}, ${log.data.position.y})`;
+      if (log.data.position) {
+        return `${log.data.tokenName || 'Токен'} убран с позиции (${log.data.position.x}, ${log.data.position.y})`;
+      }
+      const reason = log.data.reason ? ` (${log.data.reason})` : '';
+      return `${log.data.tokenName || 'Токен'} убран${reason}`;
     case 'token_hide':
       return `${log.data.tokenName || 'Токен'} ушел с поля зрения`;
     case 'token_show':

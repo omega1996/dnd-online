@@ -478,6 +478,7 @@ function applyAction(room, action, socket) {
           // Сохраняем информацию о токене перед удалением для лога
           const tokenName = token.name;
           const tokenId = token.id;
+          const tokenPosition = { x: token.gridX || 0, y: token.gridY || 0 };
           delete room.state.tokens[tokenId];
           
           // Добавляем лог об удалении NPC токена
@@ -487,6 +488,7 @@ function applyAction(room, action, socket) {
             {
               tokenId: tokenId,
               tokenName: tokenName,
+              position: tokenPosition,
               reason: "NPC defeated (HP = 0)",
             },
             socket.id,
