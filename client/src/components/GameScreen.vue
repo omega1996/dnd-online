@@ -95,12 +95,13 @@ const showSetMapForm = ref(false);
 const newMapFile = ref(null);
 const isUploadingMap = ref(false);
 const gridRows = ref(10);
-const gridColumns = ref(10);
+const gridColumns = ref(16);
 
 // Computed для карты и токенов
 const mapSrc = computed(() => props.roomState?.map?.src || null);
 const tokens = computed(() => props.roomState?.tokens || {});
 const gameLogs = computed(() => props.roomState?.logs || []);
+const mapGrid = computed(() => props.roomState?.map?.grid || { rows: 10, columns: 10, enabled: true });
 
 // Размеры для игрового поля в соотношении 16:9
 const gameAreaHeight = ref(0);
@@ -312,7 +313,7 @@ async function handleSetMap() {
       grid: {
         rows: parseInt(gridRows.value) || 10,
         columns: parseInt(gridColumns.value) || 10,
-        enabled: true
+        enabled: props.roomState?.map?.grid?.enabled ?? true
       }
     });
 
@@ -325,6 +326,21 @@ async function handleSetMap() {
   } finally {
     isUploadingMap.value = false;
   }
+}
+
+// Переключение отображения сетки (для мастера)
+function handleToggleGrid() {
+  const currentGrid = props.roomState?.map?.grid || { rows: 10, columns: 10, enabled: true };
+  const newEnabled = !currentGrid.enabled;
+  
+  // Отправляем только обновление сетки, без изменения карты
+  sendAction("MAP_SET", {
+    grid: {
+      rows: currentGrid.rows,
+      columns: currentGrid.columns,
+      enabled: newEnabled
+    }
+  });
 }
 
 // Обработчик перемещения токена
@@ -816,11 +832,47 @@ onUnmounted(() => {
           <BoardCanvas
             :map-src="mapSrc"
             :tokens="tokens"
-            :map-grid="roomState?.map?.grid"
+            :map-grid="mapGrid"
             :on-token-move="handleTokenMove"
             :on-token-click="handleTokenClick"
             :on-token-right-click="handleTokenRightClick"
           />
+        </div>
+        
+        <!-- Настройки под картой (только для GM) -->
+        <div
+          v-if="gameStore.isGM"
+          :style="{
+            width: `${gameAreaWidth}px`,
+            padding: '12px 16px',
+            background: '#f9f9f9',
+            borderTop: '1px solid #ddd',
+            flexShrink: 0,
+          }"
+        >
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              cursor: pointer;
+              user-select: none;
+            "
+          >
+            <input
+              type="checkbox"
+              :checked="roomState?.map?.grid?.enabled ?? true"
+              @change="handleToggleGrid"
+              style="
+                width: 18px;
+                height: 18px;
+                cursor: pointer;
+              "
+            />
+            <span style="font-size: 14px; color: #333">
+              Показать сетку карты
+            </span>
+          </label>
         </div>
         
         <!-- Логи под картой -->

@@ -593,13 +593,37 @@ function setupInteraction() {
 
 // Отрисовка сетки
 function drawGrid() {
-  if (!worldContainer.value || !app.value || !props.mapGrid || !props.mapGrid.enabled) {
+  console.log('[BoardCanvas] drawGrid called', {
+    hasWorldContainer: !!worldContainer.value,
+    hasApp: !!app.value,
+    mapGrid: props.mapGrid,
+    mapGridEnabled: props.mapGrid?.enabled
+  });
+
+  if (!worldContainer.value || !app.value) {
+    console.warn('[BoardCanvas] drawGrid: missing worldContainer or app');
+    return;
+  }
+
+  // Проверяем, должна ли сетка быть видна
+  if (!props.mapGrid || !props.mapGrid.enabled) {
+    console.log('[BoardCanvas] Grid disabled, removing if exists');
+    // Удаляем сетку если она отключена
+    if (gridGraphics.value) {
+      if (gridGraphics.value.parent === worldContainer.value) {
+        worldContainer.value.removeChild(gridGraphics.value);
+      }
+      gridGraphics.value.destroy();
+      gridGraphics.value = null;
+    }
     return;
   }
 
   // Удаляем старую сетку
   if (gridGraphics.value) {
-    worldContainer.value.removeChild(gridGraphics.value);
+    if (gridGraphics.value.parent === worldContainer.value) {
+      worldContainer.value.removeChild(gridGraphics.value);
+    }
     gridGraphics.value.destroy();
     gridGraphics.value = null;
   }
@@ -612,29 +636,65 @@ function drawGrid() {
   const cellHeight = canvasHeight / rows;
 
   gridGraphics.value = new PIXI.Graphics();
-  gridGraphics.value.lineStyle({ width: 1, color: 0xffffff, alpha: 0.3 });
-
+  
+  // Используем правильный синтаксис для PIXI.js v8
+  // Рисуем линии как тонкие прямоугольники с заливкой (более надежный способ)
   // Вертикальные линии
   for (let i = 0; i <= columns; i++) {
-    const x = i * cellWidth;
-    gridGraphics.value.moveTo(x, 0);
-    gridGraphics.value.lineTo(x, canvasHeight);
+    const x = Math.round(i * cellWidth);
+    gridGraphics.value.rect(x, 0, 1, canvasHeight);
   }
 
   // Горизонтальные линии
   for (let i = 0; i <= rows; i++) {
-    const y = i * cellHeight;
-    gridGraphics.value.moveTo(0, y);
-    gridGraphics.value.lineTo(canvasWidth, y);
+    const y = Math.round(i * cellHeight);
+    gridGraphics.value.rect(0, y, canvasWidth, 1);
   }
 
-  // Добавляем сетку после карты, но перед токенами
-  if (mapSprite.value) {
+  // Применяем заливку ко всем прямоугольникам
+  // В PIXI.js v8 нужно вызвать fill() после всех rect()
+  gridGraphics.value.fill({ color: 0x808080, alpha: 1.0 });
+  
+  // Убеждаемся, что графика видна
+  gridGraphics.value.visible = true;
+  gridGraphics.value.alpha = 1.0;
+  
+  console.log('[BoardCanvas] Grid graphics created:', {
+    bounds: gridGraphics.value.getBounds(),
+    visible: gridGraphics.value.visible,
+    alpha: gridGraphics.value.alpha
+  });
+
+  // Добавляем сетку поверх карты, но под токенами
+  // Сетка должна быть последним элементом перед токенами
+  if (mapSprite.value && mapSprite.value.parent === worldContainer.value) {
     const mapIndex = worldContainer.value.getChildIndex(mapSprite.value);
     worldContainer.value.addChildAt(gridGraphics.value, mapIndex + 1);
+    console.log('[BoardCanvas] Grid added after map at index:', mapIndex + 1, 'total children:', worldContainer.value.children.length);
   } else {
+    // Если карты нет, добавляем в начало
     worldContainer.value.addChildAt(gridGraphics.value, 0);
+    console.log('[BoardCanvas] Grid added at index 0 (no map), total children:', worldContainer.value.children.length);
   }
+  
+  // Убеждаемся, что сетка видна
+  gridGraphics.value.visible = true;
+  gridGraphics.value.alpha = 1.0;
+  
+  console.log('[BoardCanvas] Grid drawn:', { 
+    rows, 
+    columns, 
+    enabled: props.mapGrid.enabled, 
+    width: canvasWidth, 
+    height: canvasHeight,
+    cellWidth,
+    cellHeight,
+    gridGraphicsExists: !!gridGraphics.value,
+    gridGraphicsParent: gridGraphics.value?.parent === worldContainer.value,
+    gridGraphicsVisible: gridGraphics.value?.visible,
+    gridGraphicsAlpha: gridGraphics.value?.alpha,
+    gridGraphicsBounds: gridGraphics.value?.getBounds()
+  });
 }
 
 // Обновление размера карты при изменении размера canvas

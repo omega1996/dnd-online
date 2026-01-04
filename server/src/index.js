@@ -322,11 +322,18 @@ function applyAction(room, action, socket) {
 
   switch (type) {
     case "MAP_SET": {
-      if (!payload || typeof payload.src !== "string") {
+      if (!payload) {
         return { ok: false, error: "INVALID_PAYLOAD" };
       }
       const oldMapSrc = room.state.map.src;
-      room.state.map.src = payload.src;
+      // Обновляем src только если он передан
+      if (payload.src !== undefined) {
+        if (typeof payload.src !== "string" && payload.src !== null) {
+          return { ok: false, error: "INVALID_PAYLOAD" };
+        }
+        room.state.map.src = payload.src;
+      }
+      // Обновляем параметры сетки
       if (payload.grid) {
         if (typeof payload.grid.rows === "number") {
           room.state.map.grid.rows = payload.grid.rows;
@@ -339,12 +346,13 @@ function applyAction(room, action, socket) {
         }
       }
       // При загрузке новой карты сбрасываем все токены на позицию 0,0
-      for (const tokenId in room.state.tokens) {
-        room.state.tokens[tokenId].gridX = 0;
-        room.state.tokens[tokenId].gridY = 0;
-      }
-      // Добавляем лог смены карты
-      if (oldMapSrc !== payload.src) {
+      // Но только если карта действительно изменилась
+      if (payload.src !== undefined && oldMapSrc !== payload.src) {
+        for (const tokenId in room.state.tokens) {
+          room.state.tokens[tokenId].gridX = 0;
+          room.state.tokens[tokenId].gridY = 0;
+        }
+        // Добавляем лог смены карты
         addLog(
           room,
           "map_change",
