@@ -1303,6 +1303,7 @@ onUnmounted(() => {
       v-if="selectedCharacter"
       :character="selectedCharacter"
       :room-tokens="tokens"
+      :on-custom-roll="handleCustomDiceRoll"
       @close="selectedCharacter = null"
     />
 

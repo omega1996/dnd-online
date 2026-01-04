@@ -11,6 +11,11 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  // Функция для броска кастомного кубика
+  onCustomRoll: {
+    type: Function,
+    default: null,
+  },
 });
 
 const emit = defineEmits(["close"]);
@@ -164,6 +169,71 @@ const imageUrl = computed(() => {
          props.character?.characterData?.character?.[0]?.image_url || 
          null;
 });
+
+// Парсинг строки урона (например "1d4+1 piercing" или "1d8+2 bludgeoning")
+function parseDamageString(damageString) {
+  if (!damageString || typeof damageString !== 'string') {
+    return null;
+  }
+  
+  // Убираем тип урона (piercing, bludgeoning и т.д.)
+  const withoutType = damageString.trim().split(/\s+/)[0];
+  
+  // Парсим формат типа "1d4+1" или "1d8+2" или "2d6" или "1d4-1"
+  const match = withoutType.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
+  
+  if (!match) {
+    return null;
+  }
+  
+  const diceCount = parseInt(match[1], 10);
+  const diceSides = parseInt(match[2], 10);
+  const modifier = match[3] ? parseInt(match[3], 10) : 0;
+  
+  return {
+    diceCount,
+    diceSides,
+    modifier,
+  };
+}
+
+// Бросок кубика урона
+function rollDamage(damageString) {
+  if (!props.onCustomRoll) {
+    return;
+  }
+  
+  const parsed = parseDamageString(damageString);
+  if (!parsed) {
+    console.error('Не удалось распарсить строку урона:', damageString);
+    return;
+  }
+  
+  // Бросаем кубики
+  const results = [];
+  for (let i = 0; i < parsed.diceCount; i++) {
+    results.push(Math.floor(Math.random() * parsed.diceSides) + 1);
+  }
+  
+  // Суммируем результаты
+  const sum = results.reduce((acc, val) => acc + val, 0) + parsed.modifier;
+  
+  // Формируем описание в формате как в CustomDiceModal (например "D4+1" или "D6+D6+2")
+  const diceParts = Array(parsed.diceCount).fill(parsed.diceSides).map(sides => `D${sides}`).join('+');
+  const modifierStr = parsed.modifier !== 0 
+    ? (parsed.modifier > 0 ? `+${parsed.modifier}` : `${parsed.modifier}`)
+    : '';
+  const description = diceParts + modifierStr;
+  
+  // Отправляем данные для броска
+  props.onCustomRoll({
+    dice: Array(parsed.diceCount).fill(parsed.diceSides),
+    results: results,
+    modifier: parsed.modifier,
+    sum: sum,
+    description: description,
+  });
+}
 </script>
 
 <template>
@@ -383,8 +453,31 @@ const imageUrl = computed(() => {
                 "
               >
                 <div style="font-weight: 600; margin-bottom: 4px">{{ attack.name }}</div>
-                <div style="font-size: 14px; color: #666">
-                  Attack: <strong>{{ attack.attackBonus }}</strong> | Damage: <strong>{{ attack.damage }}</strong>
+                <div style="font-size: 14px; color: #666; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <span>
+                    Attack: <strong>{{ attack.attackBonus }}</strong> | Damage: <strong>{{ attack.damage }}</strong>
+                  </span>
+                  <button
+                    v-if="onCustomRoll && attack.damage"
+                    @click="rollDamage(attack.damage)"
+                    style="
+                      padding: 4px 12px;
+                      border-radius: 4px;
+                      border: 1px solid #007bff;
+                      background: #007bff;
+                      color: white;
+                      cursor: pointer;
+                      font-size: 12px;
+                      font-weight: 500;
+                      margin-left: auto;
+                      transition: all 0.2s;
+                    "
+                    @mouseenter="$event.target.style.background = '#0056b3'"
+                    @mouseleave="$event.target.style.background = '#007bff'"
+                    title="Кинуть кубик урона"
+                  >
+                    🎲 Бросить урон
+                  </button>
                 </div>
               </div>
             </div>
