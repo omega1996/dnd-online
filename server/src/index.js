@@ -775,6 +775,71 @@ io.on("connection", (socket) => {
     ack?.({ ok: true });
   });
 
+  // WebRTC signaling handlers
+  socket.on("webrtc:offer", ({ to, from, sdp }) => {
+    const code = socket.data.roomCode;
+    if (!code || !rooms.has(code)) {
+      console.warn(`[WebRTC] Offer from ${from} to ${to}: not in room`);
+      return;
+    }
+
+    const room = rooms.get(code);
+    // Verify both users are in the same room
+    if (!room.members.has(from) || !room.members.has(to)) {
+      console.warn(`[WebRTC] Offer from ${from} to ${to}: users not in same room`);
+      return;
+    }
+
+    console.log(`[WebRTC] Relaying offer from ${from} to ${to}`);
+    io.to(to).emit("webrtc:offer", { from, sdp });
+  });
+
+  socket.on("webrtc:answer", ({ to, from, sdp }) => {
+    const code = socket.data.roomCode;
+    if (!code || !rooms.has(code)) {
+      console.warn(`[WebRTC] Answer from ${from} to ${to}: not in room`);
+      return;
+    }
+
+    const room = rooms.get(code);
+    // Verify both users are in the same room
+    if (!room.members.has(from) || !room.members.has(to)) {
+      console.warn(`[WebRTC] Answer from ${from} to ${to}: users not in same room`);
+      return;
+    }
+
+    console.log(`[WebRTC] Relaying answer from ${from} to ${to}`);
+    io.to(to).emit("webrtc:answer", { from, sdp });
+  });
+
+  socket.on("webrtc:ice", ({ to, from, candidate }) => {
+    const code = socket.data.roomCode;
+    if (!code || !rooms.has(code)) {
+      console.warn(`[WebRTC] ICE from ${from} to ${to}: not in room`);
+      return;
+    }
+
+    const room = rooms.get(code);
+    // Verify both users are in the same room
+    if (!room.members.has(from) || !room.members.has(to)) {
+      console.warn(`[WebRTC] ICE from ${from} to ${to}: users not in same room`);
+      return;
+    }
+
+    console.log(`[WebRTC] Relaying ICE candidate from ${from} to ${to}`);
+    io.to(to).emit("webrtc:ice", { from, candidate });
+  });
+
+  socket.on("webrtc:stop", () => {
+    const code = socket.data.roomCode;
+    if (!code || !rooms.has(code)) return;
+
+    const room = rooms.get(code);
+    // Broadcast stop to all players in the room
+    console.log(`[WebRTC] Broadcasting stop signal from ${socket.id} to room ${code}`);
+    io.to(code).emit("webrtc:stop", {});
+  });
+
   socket.on("disconnect", () => {
     const code = socket.data.roomCode;
     if (!code || !rooms.has(code)) return;

@@ -16,6 +16,7 @@ import DiceRoller from "./DiceRoller.vue";
 import TokenContextMenu from "./TokenContextMenu.vue";
 import DamageModal from "./DamageModal.vue";
 import { buildApiUrl, buildAssetUrl } from "../utils/api.js";
+import * as webrtcAudio from "../webrtcAudio.js";
 
 const props = defineProps({
   serverUrl: {
@@ -96,6 +97,10 @@ const newMapFile = ref(null);
 const isUploadingMap = ref(false);
 const gridRows = ref(10);
 const gridColumns = ref(16);
+
+// WebRTC audio sharing
+const isSharingAudio = ref(false);
+const audioSharingError = ref(null);
 
 // Computed для карты и токенов
 const mapSrc = computed(() => props.roomState?.map?.src || null);
@@ -542,11 +547,91 @@ function handleShowCharacterToken(tokenId) {
   sendAction("TOKEN_SHOW", { id: tokenId });
 }
 
+// WebRTC audio sharing handlers
+async function handleStartAudioSharing() {
+  if (isSharingAudio.value) {
+    return;
+  }
+
+  audioSharingError.value = null;
+  
+  try {
+    if (gameStore.isGM) {
+      await webrtcAudio.startGMAudioSharing(props.members, props.me);
+      isSharingAudio.value = true;
+    }
+  } catch (error) {
+    console.error('[GameScreen] Failed to start audio sharing:', error);
+    audioSharingError.value = error.message || 'Failed to start audio sharing';
+    isSharingAudio.value = false;
+  }
+}
+
+function handleStopAudioSharing() {
+  if (gameStore.isGM) {
+    webrtcAudio.stopGMAudioSharing();
+    isSharingAudio.value = false;
+    audioSharingError.value = null;
+  }
+}
+
+// Watch for member changes to create/remove peer connections (GM only)
+watch(() => props.members, (newMembers, oldMembers) => {
+  if (gameStore.isGM && isSharingAudio.value) {
+    const oldMemberIds = new Set((oldMembers || []).map(m => m.id));
+    const newMemberIds = new Set(newMembers.map(m => m.id));
+    
+    // Find new players that joined
+    const newPlayers = newMembers.filter(m => 
+      m.id !== props.me && 
+      m.role === 'Player' && 
+      !oldMemberIds.has(m.id)
+    );
+    
+    // Find players that left
+    const leftPlayers = (oldMembers || []).filter(m => 
+      m.id !== props.me && 
+      m.role === 'Player' && 
+      !newMemberIds.has(m.id)
+    );
+    
+    // Create peer connections for new players
+    if (newPlayers.length > 0) {
+      console.log('[GameScreen] New players joined, creating peer connections:', newPlayers);
+      newPlayers.forEach(async (player) => {
+        try {
+          await webrtcAudio.addGMPeerConnection(player.id, props.me);
+        } catch (error) {
+          console.error('[GameScreen] Failed to create peer connection for new player:', error);
+        }
+      });
+    }
+    
+    // Remove peer connections for players that left
+    if (leftPlayers.length > 0) {
+      console.log('[GameScreen] Players left, removing peer connections:', leftPlayers);
+      leftPlayers.forEach((player) => {
+        webrtcAudio.removeGMPeerConnection(player.id);
+      });
+    }
+  }
+}, { deep: true });
+
 // Загружаем персонажей и NPC при монтировании
 onMounted(async () => {
   await fetchCharacters();
   if (gameStore.isGM) {
     await fetchNPCs();
+    // Initialize GM audio sharing with state change callback
+    webrtcAudio.initGMAudioSharing(props.members, props.me, (sharing) => {
+      isSharingAudio.value = sharing;
+      if (!sharing) {
+        audioSharingError.value = null;
+      }
+    });
+  } else {
+    // Initialize player audio receiving
+    webrtcAudio.initPlayerAudioReceiving(props.me);
   }
 });
 
@@ -732,6 +817,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
+  // Clean up WebRTC resources
+  webrtcAudio.cleanup();
 });
 </script>
 
@@ -919,6 +1006,30 @@ onUnmounted(() => {
           </h3>
 
           <div style="display: flex; flex-direction: column; gap: 12px">
+            <!-- Share Audio Button -->
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <button
+                @click="isSharingAudio ? handleStopAudioSharing() : handleStartAudioSharing()"
+                :disabled="audioSharingError !== null"
+                style="
+                  padding: 10px 16px;
+                  border-radius: 8px;
+                  border: 1px solid #ccc;
+                  background: white;
+                  cursor: pointer;
+                  font-weight: 500;
+                  text-align: left;
+                "
+              >
+                {{ isSharingAudio ? "🔊 Stop Sharing Audio" : "🔇 Share Audio" }}
+              </button>
+              <div v-if="isSharingAudio" style="font-size: 12px; color: #28a745; padding-left: 4px">
+                Sharing audio to players...
+              </div>
+              <div v-if="audioSharingError" style="font-size: 12px; color: #dc3545; padding-left: 4px">
+                {{ audioSharingError }}
+              </div>
+            </div>
             <!-- Кнопка добавления токена -->
             <button
               @click="showAddTokenForm = !showAddTokenForm"
