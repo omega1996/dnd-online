@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import d20Icon from "../assets/d20.png";
 
 const props = defineProps({
   character: {
@@ -234,6 +235,69 @@ function rollDamage(damageString) {
     description: description,
   });
 }
+
+// Бросок проверки характеристики (D20 + модификатор)
+function rollAbilityCheck(abilityKey, abilityName) {
+  if (!props.onCustomRoll || !abilitiesData.value) {
+    return;
+  }
+  
+  const modifier = abilitiesData.value.bonuses[abilityKey] || 0;
+  
+  // Бросаем D20
+  const d20Result = Math.floor(Math.random() * 20) + 1;
+  const sum = d20Result + modifier;
+  
+  // Формируем описание
+  const modifierStr = modifier !== 0 
+    ? (modifier > 0 ? `+${modifier}` : `${modifier}`)
+    : '';
+  const description = `D20${modifierStr} (${abilityName.toUpperCase()})`;
+  
+  // Отправляем данные для броска
+  props.onCustomRoll({
+    dice: [20],
+    results: [d20Result],
+    modifier: modifier,
+    sum: sum,
+    description: description,
+  });
+}
+
+// Бросок проверки навыка (D20 + модификатор навыка)
+function rollSkillCheck(skill) {
+  if (!props.onCustomRoll) {
+    return;
+  }
+  
+  // Парсим модификатор из строки (например "+3", "-1", "0")
+  let modifier = 0;
+  if (skill.value && typeof skill.value === 'string') {
+    const match = skill.value.match(/^([+-]?\d+)$/);
+    if (match) {
+      modifier = parseInt(match[1], 10);
+    }
+  }
+  
+  // Бросаем D20
+  const d20Result = Math.floor(Math.random() * 20) + 1;
+  const sum = d20Result + modifier;
+  
+  // Формируем описание
+  const modifierStr = modifier !== 0 
+    ? (modifier > 0 ? `+${modifier}` : `${modifier}`)
+    : '';
+  const description = `D20${modifierStr} (${skill.name})`;
+  
+  // Отправляем данные для броска
+  props.onCustomRoll({
+    dice: [20],
+    results: [d20Result],
+    modifier: modifier,
+    sum: sum,
+    description: description,
+  });
+}
 </script>
 
 <template>
@@ -361,6 +425,7 @@ function rollDamage(damageString) {
                   background: #f8f9fa;
                   border-radius: 8px;
                   text-align: center;
+                  position: relative;
                 "
               >
                 <div style="font-size: 12px; color: #666; margin-bottom: 4px; text-transform: uppercase">
@@ -369,8 +434,20 @@ function rollDamage(damageString) {
                 <div style="font-size: 20px; font-weight: bold; color: #333">
                   {{ value }}
                 </div>
-                <div style="font-size: 12px; color: #666; margin-top: 2px">
-                  ({{ abilitiesData.bonuses[key] >= 0 ? '+' : '' }}{{ abilitiesData.bonuses[key] }})
+                <div style="font-size: 12px; color: #666; margin-top: 2px; display: flex; align-items: center; justify-content: center; gap: 4px">
+                  <span>({{ abilitiesData.bonuses[key] >= 0 ? '+' : '' }}{{ abilitiesData.bonuses[key] }})</span>
+                  <button
+                    v-if="onCustomRoll"
+                    @click="rollAbilityCheck(key, key)"
+                    class="d20-button"
+                    title="Бросить D20 + модификатор"
+                  >
+                    <img 
+                      :src="d20Icon" 
+                      alt="D20" 
+                      style="width: 20px; height: 20px; object-fit: contain;"
+                    />
+                  </button>
                 </div>
               </div>
             </div>
@@ -390,13 +467,28 @@ function rollDamage(damageString) {
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
+                  gap: 8px;
                 "
               >
-                <span>
+                <span style="flex: 1;">
                   <span v-if="skill.proficient" style="color: #28a745; margin-right: 4px">✓</span>
                   {{ skill.name }}
                 </span>
-                <strong>{{ skill.value }}</strong>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <strong>{{ skill.value }}</strong>
+                  <button
+                    v-if="onCustomRoll"
+                    @click="rollSkillCheck(skill)"
+                    class="d20-button"
+                    title="Бросить D20 + модификатор"
+                  >
+                    <img 
+                      :src="d20Icon" 
+                      alt="D20" 
+                      style="width: 20px; height: 20px; object-fit: contain;"
+                    />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -638,3 +730,31 @@ function rollDamage(damageString) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.d20-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.d20-button:hover {
+  opacity: 1;
+  background: rgba(0, 123, 255, 0.1);
+  transform: scale(1.1);
+}
+
+.d20-button:active {
+  transform: scale(0.95);
+}
+</style>

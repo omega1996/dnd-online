@@ -267,6 +267,7 @@ function hasPermission(room, action, socketId) {
       return tokenToRemove.ownerId === socketId;
 
     case "DICE_ROLL":
+    case "DICE_ROLL_CUSTOM":
       // Все могут бросать кубики
       return true;
 
