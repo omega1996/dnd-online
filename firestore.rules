@@ -40,5 +40,40 @@ service cloud.firestore {
       allow delete: if request.auth != null 
         && resource.data.userId == request.auth.uid;
     }
+    
+    // Правила для NPC (неигровых персонажей)
+    match /npcs/{npcId} {
+      // Разрешаем чтение NPC всем авторизованным пользователям
+      // Это нужно для того, чтобы GM мог видеть все доступные NPC шаблоны
+      allow read: if request.auth != null;
+      
+      // Вспомогательная функция для проверки структуры NPC
+      function isValidNPCData() {
+        let hasUserId = request.resource.data.userId == request.auth.uid;
+        let hasName = request.resource.data.name is string;
+        let hasImageUrl = request.resource.data.imageUrl is string;
+        let hasDescription = request.resource.data.description is string;
+        let hasStats = request.resource.data.stats is map
+          && request.resource.data.stats.maxHitPoints is int
+          && request.resource.data.stats.agility is int
+          && request.resource.data.stats.strength is int
+          && request.resource.data.stats.intelligence is int;
+        
+        return hasUserId && hasName && hasImageUrl && hasDescription && hasStats;
+      }
+      
+      // Разрешаем создание NPC авторизованным пользователям
+      allow create: if request.auth != null && isValidNPCData();
+      
+      // Разрешаем обновление только своих NPC
+      allow update: if request.auth != null 
+        && resource.data.userId == request.auth.uid
+        && isValidNPCData()
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['userId']));
+      
+      // Разрешаем удаление только своих NPC
+      allow delete: if request.auth != null 
+        && resource.data.userId == request.auth.uid;
+    }
   }
 }

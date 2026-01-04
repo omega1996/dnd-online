@@ -3,10 +3,14 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import BoardCanvas from "./BoardCanvas.vue";
 import { useAuth } from "../composables/useAuth";
 import { useCharacters } from "../composables/useCharacters";
+import { useNPCs } from "../composables/useNPCs";
 import { useGameStore } from "../stores/gameStore";
 import CharacterViewModal from "./CharacterViewModal.vue";
 import CreateCharacterModal from "./CreateCharacterModal.vue";
 import CharacterCard from "./CharacterCard.vue";
+import NPCCard from "./NPCCard.vue";
+import CreateNPCModal from "./CreateNPCModal.vue";
+import NPCViewModal from "./NPCViewModal.vue";
 import GameLogs from "./GameLogs.vue";
 import DiceRoller from "./DiceRoller.vue";
 import TokenContextMenu from "./TokenContextMenu.vue";
@@ -48,8 +52,9 @@ const props = defineProps({
 const emit = defineEmits(["leave", "token-move", "action", "character-token-added", "hide-token", "show-token"]);
 
 // Авторизация
-const { logout } = useAuth();
+const { logout, user } = useAuth();
 const { characters, fetchCharacters, loading: charactersLoading, getCharacterByIdReadOnly } = useCharacters();
+const { npcs, fetchNPCs, loading: npcsLoading, deleteNPC } = useNPCs();
 
 // Game store
 const gameStore = useGameStore();
@@ -58,6 +63,12 @@ const gameStore = useGameStore();
 const selectedCharacter = ref(null);
 const loadingCharacter = ref(false);
 const showCreateCharacterModal = ref(false);
+
+// Модальное окно для NPC
+const showCreateNPCModal = ref(false);
+const npcToEdit = ref(null);
+const showNPCViewModal = ref(false);
+const selectedNPC = ref(null);
 
 // Модальное окно подтверждения удаления токена
 const showDeleteTokenModal = ref(false);
@@ -515,9 +526,12 @@ function handleShowCharacterToken(tokenId) {
   sendAction("TOKEN_SHOW", { id: tokenId });
 }
 
-// Загружаем персонажей при монтировании
+// Загружаем персонажей и NPC при монтировании
 onMounted(async () => {
   await fetchCharacters();
+  if (gameStore.isGM) {
+    await fetchNPCs();
+  }
 });
 
 // Следим за pendingCharacterToken и добавляем токен при его появлении
@@ -531,6 +545,70 @@ watch(() => props.pendingCharacterToken, (character) => {
 // Обработчик создания персонажа
 function handleCharacterCreated() {
   fetchCharacters();
+}
+
+// Обработчики для NPC
+function handleAddNPCToken(npc) {
+  if (!npc || !npc.imageUrl) {
+    console.error("NPC data is missing");
+    return;
+  }
+
+  // Генерируем уникальный ID для токена
+  const tokenId = generateTokenId();
+  
+  // Позиция на сетке (0, 0) - начальная позиция
+  const gridX = 0;
+  const gridY = 0;
+
+  const payload = {
+    id: tokenId,
+    gridX,
+    gridY,
+    src: npc.imageUrl,
+    name: npc.name,
+    ownerId: props.me, // GM владеет NPC токенами
+    npcId: npc.id, // Сохраняем ID NPC шаблона
+    isNPC: true, // Помечаем как NPC
+    hitPoints: npc.stats?.maxHitPoints || 50, // Начальные HP равны максимальным
+  };
+
+  // Отправляем действие на сервер
+  sendAction("TOKEN_ADD", payload);
+}
+
+function handleViewNPC(npc) {
+  selectedNPC.value = npc;
+  showNPCViewModal.value = true;
+}
+
+function handleCreateNPC() {
+  npcToEdit.value = null;
+  showCreateNPCModal.value = true;
+}
+
+function handleEditNPC(npc) {
+  npcToEdit.value = npc;
+  showCreateNPCModal.value = true;
+}
+
+function handleNPCCreated() {
+  fetchNPCs();
+}
+
+function handleNPCUpdated() {
+  fetchNPCs();
+}
+
+async function handleDeleteNPC(npc) {
+  if (confirm(`Are you sure you want to delete "${npc.name}"?`)) {
+    try {
+      await deleteNPC(npc.id);
+      await fetchNPCs();
+    } catch (err) {
+      alert(`Failed to delete NPC: ${err.message}`);
+    }
+  }
 }
 
 function handleLeave() {
@@ -1054,6 +1132,55 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <!-- NPC (только для GM) -->
+        <div v-if="gameStore.isGM">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin-top: 0; margin-bottom: 0; font-size: 18px">
+              NPCs
+            </h3>
+            <button
+              @click="handleCreateNPC"
+              style="
+                padding: 6px 12px;
+                border-radius: 4px;
+                border: none;
+                background: #28a745;
+                color: white;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 500;
+              "
+              title="Create new NPC"
+            >
+              + New
+            </button>
+          </div>
+
+          <div v-if="npcsLoading" style="text-align: center; padding: 12px; color: #666; font-size: 13px;">
+            Loading...
+          </div>
+
+          <div v-else-if="npcs.length === 0" style="text-align: center; padding: 16px; color: #666; background: white; border-radius: 6px; border: 1px solid #ddd; font-size: 13px;">
+            No NPCs yet. Create one to add it as a token!
+          </div>
+
+          <div v-else style="display: flex; flex-direction: column; gap: 8px;">
+            <NPCCard
+              v-for="npc in npcs"
+              :key="npc.id"
+              :npc="npc"
+              :show-add-token="true"
+              :show-edit-delete="true"
+              :current-user-id="user?.uid"
+              size="compact"
+              @view="handleViewNPC"
+              @add-token="handleAddNPCToken"
+              @edit="handleEditNPC"
+              @delete="handleDeleteNPC"
+            />
+          </div>
+        </div>
+
         <!-- Список участников -->
         <div>
           <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px">
@@ -1121,6 +1248,25 @@ onUnmounted(() => {
       :server-url="serverUrl"
       @close="showCreateCharacterModal = false"
       @created="handleCharacterCreated"
+    />
+
+    <!-- Модальное окно создания/редактирования NPC -->
+    <CreateNPCModal
+      v-if="showCreateNPCModal"
+      :visible="showCreateNPCModal"
+      :server-url="serverUrl"
+      :npc="npcToEdit"
+      @close="showCreateNPCModal = false; npcToEdit = null"
+      @created="handleNPCCreated"
+      @updated="handleNPCUpdated"
+    />
+
+    <!-- Модальное окно просмотра NPC -->
+    <NPCViewModal
+      v-if="showNPCViewModal && selectedNPC"
+      :visible="showNPCViewModal"
+      :npc="selectedNPC"
+      @close="showNPCViewModal = false; selectedNPC = null"
     />
 
     <!-- Контекстное меню токена -->

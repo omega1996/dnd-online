@@ -13,6 +13,7 @@ export function useGameLogs(logsRef) {
     token_remove: true,
     token_hide: true,
     token_show: true,
+    token_damage: true,
   });
 
   // Переключение фильтра по типу
@@ -40,6 +41,7 @@ export function useGameLogs(logsRef) {
       token_remove: 'Удаление токена',
       token_hide: 'Скрытие токена',
       token_show: 'Показ токена',
+      token_damage: 'Урон',
     };
     return labels[type] || type;
   }

@@ -34,6 +34,7 @@ const logTypes = [
   { key: 'token_remove', label: 'Удаление токенов' },
   { key: 'token_hide', label: 'Скрытие токенов' },
   { key: 'token_show', label: 'Показ токенов' },
+  { key: 'token_damage', label: 'Урон' },
 ];
 
 // Форматирование сообщения лога
@@ -60,6 +61,14 @@ function formatLogMessage(log) {
       return `${log.data.tokenName || 'Токен'} ушел с поля зрения`;
     case 'token_show':
       return `${log.data.tokenName || 'Токен'} вернулся на поле зрения`;
+    case 'token_damage':
+      const tokenName = log.data.tokenName || 'Токен';
+      const damage = log.data.damage || 0;
+      const newHP = log.data.newHP !== undefined ? log.data.newHP : 0;
+      if (newHP === 0) {
+        return `${tokenName} получил ${damage} урона. ПРИ СМЕРТИ`;
+      }
+      return `${tokenName} получил ${damage} урона (HP: ${newHP})`;
     default:
       return 'Неизвестное действие';
   }

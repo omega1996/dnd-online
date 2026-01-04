@@ -233,6 +233,10 @@ function hasPermission(room, action, socketId) {
 
     case "TOKEN_ADD":
       // Player может добавлять токены (они будут с его ownerId)
+      // Но если это NPC токен (isNPC = true), только GM может добавить его
+      if (payload && payload.isNPC === true) {
+        return isGM;
+      }
       return true;
 
     case "TOKEN_MOVE":
@@ -240,16 +244,26 @@ function hasPermission(room, action, socketId) {
     case "TOKEN_HIDE":
     case "TOKEN_SHOW":
       // Player может двигать/обновлять/скрывать/показывать только свои токены
+      // NPC токенами может управлять только GM
       if (!payload || !payload.id) return false;
       const token = room.state.tokens[payload.id];
       if (!token) return false;
+      // Если это NPC токен, только GM может управлять им
+      if (token.isNPC) {
+        return isGM;
+      }
       return token.ownerId === socketId;
 
     case "TOKEN_REMOVE":
       // Player может удалять только свои токены
+      // NPC токены может удалять только GM
       if (!payload || !payload.id) return false;
       const tokenToRemove = room.state.tokens[payload.id];
       if (!tokenToRemove) return false;
+      // Если это NPC токен, только GM может удалить его
+      if (tokenToRemove.isNPC) {
+        return isGM;
+      }
       return tokenToRemove.ownerId === socketId;
 
     case "DICE_ROLL":
@@ -360,6 +374,8 @@ function applyAction(room, action, socket) {
         name: payload.name ?? "Token",
         ownerId: payload.ownerId ?? socket.id,
         characterId: payload.characterId ?? null, // ID персонажа, если токен связан с персонажем
+        npcId: payload.npcId ?? null, // ID NPC шаблона, если токен связан с NPC
+        isNPC: payload.isNPC ?? false, // Флаг, что это NPC токен
         hitPoints: payload.hitPoints ?? null, // Текущие hit points токена
         hidden: payload.hidden ?? false, // Скрыт ли токен
       };
@@ -372,6 +388,7 @@ function applyAction(room, action, socket) {
           tokenId: token.id,
           tokenName: token.name,
           position: { x: token.gridX, y: token.gridY },
+          isNPC: token.isNPC,
         },
         socket.id,
         userName
@@ -433,8 +450,63 @@ function applyAction(room, action, socket) {
       if (payload.characterId !== undefined) {
         token.characterId = payload.characterId;
       }
+      if (payload.npcId !== undefined) {
+        token.npcId = payload.npcId;
+      }
+      if (payload.isNPC !== undefined) {
+        token.isNPC = payload.isNPC;
+      }
       if (payload.hitPoints !== undefined) {
-        token.hitPoints = payload.hitPoints;
+        // Сохраняем старые hitPoints для логирования
+        const oldHP = token.hitPoints !== null && token.hitPoints !== undefined ? token.hitPoints : 0;
+        const newHP = payload.hitPoints;
+        token.hitPoints = newHP;
+        
+        // Вычисляем нанесенный урон
+        const damageDealt = oldHP - newHP;
+        
+        // Если это NPC и HP стал 0 или меньше, удаляем токен
+        if (token.isNPC && newHP <= 0) {
+          // Сохраняем информацию о токене перед удалением для лога
+          const tokenName = token.name;
+          const tokenId = token.id;
+          delete room.state.tokens[tokenId];
+          
+          // Добавляем лог об удалении NPC токена
+          addLog(
+            room,
+            "token_remove",
+            {
+              tokenId: tokenId,
+              tokenName: tokenName,
+              reason: "NPC defeated (HP = 0)",
+            },
+            socket.id,
+            userName
+          );
+          
+          // Выходим из обработки, так как токен уже удален
+          break;
+        }
+        
+        // Добавляем лог о нанесении урона
+        if (damageDealt > 0) {
+          addLog(
+            room,
+            "token_damage",
+            {
+              tokenId: token.id,
+              tokenName: token.name,
+              damage: damageDealt,
+              oldHP: oldHP,
+              newHP: newHP,
+              isUnconscious: newHP === 0,
+              isNPC: token.isNPC,
+            },
+            socket.id,
+            userName
+          );
+        }
       }
       if (payload.hidden !== undefined) {
         token.hidden = payload.hidden;
