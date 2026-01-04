@@ -639,6 +639,17 @@ function handleDiceRoll(sides, result) {
   });
 }
 
+// Обработчик кастомного броска кубика
+function handleCustomDiceRoll(rollData) {
+  sendAction("DICE_ROLL_CUSTOM", {
+    dice: rollData.dice,
+    results: rollData.results,
+    modifier: rollData.modifier,
+    sum: rollData.sum,
+    description: rollData.description,
+  });
+}
+
 // Обработчик правого клика на токен
 function handleTokenRightClick(tokenId, x, y) {
   selectedTokenId.value = tokenId;
@@ -1131,6 +1142,7 @@ onUnmounted(() => {
         <!-- Roll the Dice -->
         <DiceRoller
           :on-roll="handleDiceRoll"
+          :on-custom-roll="handleCustomDiceRoll"
         />
 
         <!-- Мои персонажи -->

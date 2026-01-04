@@ -627,6 +627,38 @@ function applyAction(room, action, socket) {
       break;
     }
 
+    case "DICE_ROLL_CUSTOM": {
+      if (
+        !payload ||
+        !Array.isArray(payload.dice) ||
+        !Array.isArray(payload.results) ||
+        typeof payload.modifier !== "number" ||
+        typeof payload.sum !== "number" ||
+        typeof payload.description !== "string"
+      ) {
+        return { ok: false, error: "INVALID_PAYLOAD" };
+      }
+      // Проверяем, что количество кубиков соответствует количеству результатов
+      if (payload.dice.length !== payload.results.length) {
+        return { ok: false, error: "INVALID_PAYLOAD" };
+      }
+      // Добавляем лог кастомного броска кубика
+      addLog(
+        room,
+        "dice_custom",
+        {
+          dice: payload.dice,
+          results: payload.results,
+          modifier: payload.modifier,
+          sum: payload.sum,
+          description: payload.description,
+        },
+        socket.id,
+        userName
+      );
+      break;
+    }
+
     default:
       return { ok: false, error: "UNKNOWN_ACTION_TYPE" };
   }

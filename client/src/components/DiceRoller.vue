@@ -1,10 +1,19 @@
 <script setup>
+import { ref } from 'vue';
+import CustomDiceModal from './CustomDiceModal.vue';
+
 const props = defineProps({
   onRoll: {
     type: Function,
     required: true,
   },
+  onCustomRoll: {
+    type: Function,
+    required: true,
+  },
 });
+
+const showCustomModal = ref(false);
 
 const diceTypes = [
   { label: 'D4', value: 4 },
@@ -18,6 +27,18 @@ const diceTypes = [
 function rollDice(sides) {
   const result = Math.floor(Math.random() * sides) + 1;
   props.onRoll(sides, result);
+}
+
+function openCustomModal() {
+  showCustomModal.value = true;
+}
+
+function closeCustomModal() {
+  showCustomModal.value = false;
+}
+
+function handleCustomRoll(rollData) {
+  props.onCustomRoll(rollData);
 }
 </script>
 
@@ -46,7 +67,32 @@ function rollDice(sides) {
       >
         {{ dice.label }}
       </button>
+      <button
+        @click="openCustomModal"
+        style="
+          padding: 10px 16px;
+          border-radius: 6px;
+          border: 1px solid #007bff;
+          background: #007bff;
+          color: white;
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 14px;
+          transition: all 0.2s;
+        "
+        @mouseenter="$event.target.style.background = '#0056b3'"
+        @mouseleave="$event.target.style.background = '#007bff'"
+      >
+        Custom
+      </button>
     </div>
+    
+    <!-- Модальное окно кастомного броска -->
+    <CustomDiceModal
+      :visible="showCustomModal"
+      @close="closeCustomModal"
+      @roll="handleCustomRoll"
+    />
   </div>
 </template>
 

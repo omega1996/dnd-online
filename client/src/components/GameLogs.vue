@@ -29,6 +29,7 @@ const {
 const logTypes = [
   { key: 'move', label: 'Перемещения' },
   { key: 'dice', label: 'Броски кубика' },
+  { key: 'dice_custom', label: 'Кастомные броски' },
   { key: 'map_change', label: 'Смена карты' },
   { key: 'token_add', label: 'Добавление токенов' },
   { key: 'token_remove', label: 'Удаление токенов' },
@@ -51,6 +52,12 @@ function formatLogMessage(log) {
         return `${log.userName} бросил ${diceType}: ${result} - КРИТИЧЕСКАЯ УДАЧА`;
       }
       return `${log.userName} бросил ${diceType}: ${result}`;
+    case 'dice_custom':
+      // Формат: "игрок кинул кубик D6+D20+4"
+      const description = log.data.description || '';
+      const sum = log.data.sum || 0;
+      
+      return `${log.userName} кинул кубик ${description} = ${sum}`;
     case 'map_change':
       return `${log.userName} сменил карту`;
     case 'token_add':
