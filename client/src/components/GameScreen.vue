@@ -3,11 +3,14 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import BoardCanvas from "./BoardCanvas.vue";
 import { useAuth } from "../composables/useAuth";
 import { useCharacters } from "../composables/useCharacters";
+import { useGameStore } from "../stores/gameStore";
 import CharacterViewModal from "./CharacterViewModal.vue";
 import CreateCharacterModal from "./CreateCharacterModal.vue";
 import CharacterCard from "./CharacterCard.vue";
 import GameLogs from "./GameLogs.vue";
 import DiceRoller from "./DiceRoller.vue";
+import TokenContextMenu from "./TokenContextMenu.vue";
+import DamageModal from "./DamageModal.vue";
 import { buildApiUrl, buildAssetUrl } from "../utils/api.js";
 
 const props = defineProps({
@@ -46,7 +49,10 @@ const emit = defineEmits(["leave", "token-move", "action", "character-token-adde
 
 // Авторизация
 const { logout } = useAuth();
-const { characters, fetchCharacters, loading: charactersLoading } = useCharacters();
+const { characters, fetchCharacters, loading: charactersLoading, getCharacterByIdReadOnly } = useCharacters();
+
+// Game store
+const gameStore = useGameStore();
 
 // Модальное окно просмотра персонажа
 const selectedCharacter = ref(null);
@@ -56,6 +62,16 @@ const showCreateCharacterModal = ref(false);
 // Модальное окно подтверждения удаления токена
 const showDeleteTokenModal = ref(false);
 const tokenToDelete = ref(null);
+
+// Контекстное меню токена
+const contextMenuVisible = ref(false);
+const contextMenuX = ref(0);
+const contextMenuY = ref(0);
+const selectedTokenId = ref(null);
+
+// Модальное окно урона
+const showDamageModal = ref(false);
+const damageTokenId = ref(null);
 
 // Форма добавления токена (для мастера)
 const showAddTokenForm = ref(false);
@@ -73,7 +89,6 @@ const gridColumns = ref(10);
 // Computed для карты и токенов
 const mapSrc = computed(() => props.roomState?.map?.src || null);
 const tokens = computed(() => props.roomState?.tokens || {});
-const isGM = computed(() => props.myRole === "GM");
 const gameLogs = computed(() => props.roomState?.logs || []);
 
 // Размеры для игрового поля в соотношении 16:9
@@ -307,7 +322,7 @@ function handleTokenMove(tokenId, gridX, gridY) {
 }
 
 // Обработчик клика на токен (для просмотра персонажа)
-function handleTokenClick(tokenId) {
+async function handleTokenClick(tokenId) {
   if (!tokenId) return;
   
   // Находим токен на доске
@@ -317,12 +332,40 @@ function handleTokenClick(tokenId) {
     return;
   }
   
-  // Находим персонажа в локальном списке по characterId
-  const character = characters.value.find((c) => c.id === token.characterId);
+  const characterId = token.characterId;
+  console.log("Opening character view for characterId:", characterId);
+  
+  // Сначала пытаемся найти персонажа в локальном списке
+  let character = characters.value.find((c) => c.id === characterId);
+  
+  // Если не найден локально, загружаем из Firebase (даже если это не наш персонаж)
+  if (!character) {
+    console.log("Character not in local list, loading from Firebase...");
+    loadingCharacter.value = true;
+    try {
+      character = await getCharacterByIdReadOnly(characterId);
+      if (!character) {
+        console.warn("Character not found in Firebase, characterId:", characterId);
+        alert("Персонаж не найден. Возможно, он был удален.");
+        loadingCharacter.value = false;
+        return;
+      }
+      console.log("Character loaded from Firebase successfully:", character.id);
+    } catch (error) {
+      console.error("Error loading character from Firebase:", error);
+      alert(`Ошибка при загрузке персонажа: ${error.message}`);
+      loadingCharacter.value = false;
+      return;
+    } finally {
+      loadingCharacter.value = false;
+    }
+  } else {
+    console.log("Character found in local list");
+  }
+  
+  // Открываем модальное окно с информацией о персонаже
   if (character) {
     selectedCharacter.value = character;
-  } else {
-    console.log("Character not found in local list, characterId:", token.characterId);
   }
 }
 
@@ -502,6 +545,60 @@ function handleDiceRoll(sides, result) {
   });
 }
 
+// Обработчик правого клика на токен
+function handleTokenRightClick(tokenId, x, y) {
+  selectedTokenId.value = tokenId;
+  // x и y уже являются координатами относительно viewport (clientX, clientY)
+  contextMenuX.value = x;
+  contextMenuY.value = y;
+  contextMenuVisible.value = true;
+}
+
+// Закрытие контекстного меню
+function handleCloseContextMenu() {
+  contextMenuVisible.value = false;
+  selectedTokenId.value = null;
+}
+
+// Обработчик выбора пункта "нанести урон" в контекстном меню
+function handleDealDamage() {
+  if (!selectedTokenId.value) return;
+  
+  const token = tokens.value[selectedTokenId.value];
+  if (!token) return;
+  
+  damageTokenId.value = selectedTokenId.value;
+  showDamageModal.value = true;
+}
+
+// Обработчик сохранения урона
+function handleSaveDamage(damageAmount) {
+  if (!damageTokenId.value) return;
+  
+  const token = tokens.value[damageTokenId.value];
+  if (!token) return;
+  
+  // Вычисляем новые hit points
+  const currentHP = token.hitPoints !== null && token.hitPoints !== undefined ? token.hitPoints : 0;
+  const newHP = Math.max(0, currentHP - damageAmount);
+  
+  // Отправляем действие обновления токена
+  sendAction("TOKEN_UPDATE", {
+    id: damageTokenId.value,
+    hitPoints: newHP
+  });
+  
+  // Закрываем модальное окно
+  showDamageModal.value = false;
+  damageTokenId.value = null;
+}
+
+// Закрытие модального окна урона
+function handleCloseDamageModal() {
+  showDamageModal.value = false;
+  damageTokenId.value = null;
+}
+
 async function handleLogout() {
   try {
     await logout();
@@ -644,6 +741,7 @@ onUnmounted(() => {
             :map-grid="roomState?.map?.grid"
             :on-token-move="handleTokenMove"
             :on-token-click="handleTokenClick"
+            :on-token-right-click="handleTokenRightClick"
           />
         </div>
         
@@ -674,7 +772,7 @@ onUnmounted(() => {
         "
       >
         <!-- Инструменты мастера -->
-        <div v-if="isGM">
+        <div v-if="gameStore.isGM">
           <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px">
             GM Tools
           </h3>
@@ -1023,6 +1121,25 @@ onUnmounted(() => {
       :server-url="serverUrl"
       @close="showCreateCharacterModal = false"
       @created="handleCharacterCreated"
+    />
+
+    <!-- Контекстное меню токена -->
+    <TokenContextMenu
+      :visible="contextMenuVisible"
+      :x="contextMenuX"
+      :y="contextMenuY"
+      @close="handleCloseContextMenu"
+      @deal-damage="handleDealDamage"
+    />
+
+    <!-- Модальное окно урона -->
+    <DamageModal
+      v-if="showDamageModal && damageTokenId"
+      :visible="showDamageModal"
+      :token-name="tokens[damageTokenId]?.name || 'Токен'"
+      :current-hit-points="tokens[damageTokenId]?.hitPoints"
+      @close="handleCloseDamageModal"
+      @save="handleSaveDamage"
     />
 
     <!-- Модальное окно подтверждения удаления токена -->

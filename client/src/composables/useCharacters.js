@@ -248,7 +248,53 @@ async function deleteCharacter(characterId) {
   }
 }
 
-// Получить персонажа по ID
+// Получить персонажа по ID (только для чтения, без проверки владельца)
+async function getCharacterByIdReadOnly(characterId) {
+  if (!user.value) {
+    throw new Error("User must be authenticated");
+  }
+
+  if (!characterId) {
+    console.warn("getCharacterByIdReadOnly: characterId is required");
+    return null;
+  }
+
+  try {
+    console.log("Loading character from Firebase, characterId:", characterId);
+    const characterRef = doc(db, "characters", characterId);
+    const characterDoc = await getDoc(characterRef);
+    
+    if (!characterDoc.exists()) {
+      console.warn("Character document does not exist, characterId:", characterId);
+      return null;
+    }
+
+    const characterData = characterDoc.data();
+    console.log("Character data loaded from Firebase:", characterDoc.id);
+
+    // Преобразуем объекты обратно в массивы при чтении
+    if (characterData.characterData) {
+      characterData.characterData = objectsToArrays(characterData.characterData);
+    }
+
+    return {
+      id: characterDoc.id,
+      ...characterData,
+    };
+  } catch (err) {
+    console.error("Error getting character from Firebase:", err);
+    console.error("CharacterId:", characterId);
+    console.error("Error details:", {
+      code: err.code,
+      message: err.message,
+      stack: err.stack
+    });
+    error.value = err.message;
+    throw err;
+  }
+}
+
+// Получить персонажа по ID (с проверкой владельца для редактирования)
 async function getCharacterById(characterId) {
   if (!user.value) {
     throw new Error("User must be authenticated");
@@ -331,6 +377,7 @@ export function useCharacters() {
     updateCharacter,
     deleteCharacter,
     getCharacterById,
+    getCharacterByIdReadOnly,
     getCharacterByTokenId,
   };
 }

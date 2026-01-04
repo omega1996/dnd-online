@@ -24,6 +24,10 @@ const props = defineProps({
   onTokenClick: {
     type: Function,
     default: null
+  },
+  onTokenRightClick: {
+    type: Function,
+    default: null
   }
 });
 
@@ -35,6 +39,8 @@ const tokenSprites = ref(new Map());
 const resizeObserver = ref(null);
 const gridGraphics = ref(null);
 const isUpdatingTokens = ref(false);
+const contextMenuHandler = ref(null);
+const rightClickTokenId = ref(null); // ID токена, по которому был правый клик
 
 const boardState = useBoardState();
 
@@ -412,6 +418,10 @@ function setupTokenDrag(sprite) {
   const DRAG_THRESHOLD = 5; // Минимальное расстояние для начала drag
 
   sprite.on('pointerdown', (e) => {
+    // Пропускаем правый клик (кнопка 2)
+    if (e.button === 2) {
+      return;
+    }
     e.stopPropagation();
     const worldPos = globalToWorld(e.global.x, e.global.y);
     const token = props.tokens[sprite.tokenId];
@@ -440,11 +450,16 @@ function setupTokenDrag(sprite) {
       
       if (dragDistance < DRAG_THRESHOLD && finalPos) {
         // Это был клик, а не drag
-        if (props.onTokenClick) {
+        // Не открываем карточку персонажа, если это был правый клик
+        if (rightClickTokenId.value !== sprite.tokenId && props.onTokenClick) {
           const token = props.tokens[sprite.tokenId];
           if (token && token.characterId) {
             props.onTokenClick(sprite.tokenId);
           }
+        }
+        // Сбрасываем флаг правого клика
+        if (rightClickTokenId.value === sprite.tokenId) {
+          rightClickTokenId.value = null;
         }
       } else if (finalPos) {
         // Это был drag
@@ -473,11 +488,16 @@ function setupTokenDrag(sprite) {
       
       if (dragDistance < DRAG_THRESHOLD && finalPos) {
         // Это был клик, а не drag
-        if (props.onTokenClick) {
+        // Не открываем карточку персонажа, если это был правый клик
+        if (rightClickTokenId.value !== sprite.tokenId && props.onTokenClick) {
           const token = props.tokens[sprite.tokenId];
           if (token && token.characterId) {
             props.onTokenClick(sprite.tokenId);
           }
+        }
+        // Сбрасываем флаг правого клика
+        if (rightClickTokenId.value === sprite.tokenId) {
+          rightClickTokenId.value = null;
         }
       } else if (finalPos) {
         // Это был drag
@@ -521,6 +541,54 @@ function setupInteraction() {
       }
     }
   });
+
+  // Обработка правого клика для контекстного меню
+  if (canvasRef.value && app.value && !contextMenuHandler.value) {
+    contextMenuHandler.value = (e) => {
+      e.preventDefault();
+      
+      if (!props.onTokenRightClick) return;
+      
+      // Получаем координаты клика относительно canvas
+      const rect = canvasRef.value.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      // Преобразуем координаты в мировые координаты PixiJS
+      const worldPos = globalToWorld(x, y);
+      
+      // Проверяем, какой токен находится под курсором
+      let clickedTokenId = null;
+      for (const [tokenId, sprite] of tokenSprites.value.entries()) {
+        if (!sprite || sprite.parent !== worldContainer.value) continue;
+        
+        // Проверяем расстояние от курсора до центра токена
+        const distance = Math.sqrt(
+          Math.pow(worldPos.x - sprite.x, 2) + 
+          Math.pow(worldPos.y - sprite.y, 2)
+        );
+        
+        // Используем радиус токена (примерно половина размера)
+        const tokenRadius = Math.max(sprite.width, sprite.height) / 2;
+        
+        if (distance <= tokenRadius) {
+          clickedTokenId = tokenId;
+          break;
+        }
+      }
+      
+      if (clickedTokenId) {
+        // Сохраняем ID токена, по которому был правый клик, чтобы предотвратить открытие карточки персонажа
+        rightClickTokenId.value = clickedTokenId;
+        props.onTokenRightClick(clickedTokenId, e.clientX, e.clientY);
+        // Сбрасываем флаг через небольшую задержку, чтобы обычный клик не сработал
+        setTimeout(() => {
+          rightClickTokenId.value = null;
+        }, 100);
+      }
+    };
+    canvasRef.value.addEventListener('contextmenu', contextMenuHandler.value);
+  }
 }
 
 // Отрисовка сетки
@@ -643,6 +711,12 @@ onUnmounted(() => {
   if (resizeObserver.value && canvasRef.value) {
     resizeObserver.value.unobserve(canvasRef.value);
     resizeObserver.value.disconnect();
+  }
+  
+  // Удаляем обработчик правого клика
+  if (canvasRef.value && contextMenuHandler.value) {
+    canvasRef.value.removeEventListener('contextmenu', contextMenuHandler.value);
+    contextMenuHandler.value = null;
   }
   
   if (app.value) {
